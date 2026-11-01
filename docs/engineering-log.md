@@ -119,6 +119,9 @@ One recording, one speaker, 7 sentences per run, so these are indicative only.
   the LLM and TTS. I will not promise a number; I will publish the p50 and p95 we measure (E2), with the method.
 - **STT setting: `x-min-silence-ms` 500 (the default).** 300 ms split a sentence at a comma, and the 6 s cap
   split a phone number across transcripts, so neither is used.
+- **Voice: Prakash**, audio tags used sparingly, normal speed. By ear, Prakash with tags at normal speed
+  sounded the most natural. Speed 0.9 was tried and not chosen. No pre-rendering until the template lines are
+  settled, so we do not pay twice.
 - **Silent filler clips** will carry perceived responsiveness while the real reply is prepared.
 - **Fake identifiers**: invented varied digits, an unreal UPI provider (`@mirageupi`), a fake IFSC bank code.
   The "mobile numbers never start with 5" claim is unverified (no source found), so the convention is still open.
