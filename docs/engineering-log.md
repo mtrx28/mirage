@@ -79,6 +79,16 @@ elsewhere also count. The daily reset time is not confirmed (believed to be midn
 - **`gemini-3.8-flash` timed out** (`ReadTimeout`, 15 s timeout) instead of returning a 429. The cause is
   unknown: it could be a slow model, a request that hangs when the quota is exhausted, or a timeout that is too
   short. Not a quota finding. To be retried with a longer timeout.
+- **`gemini-3.5-flash-lite` answered in 0.91 s even though AI Studio showed 501 of 500 used that day.** So my
+  earlier note that it was "used up" was wrong. We cannot tell whether the dashboard count blocks anything,
+  counts differently, or whether the window had already rolled over. Our own daily budgets stay conservative
+  (450 of 500, 18 of 20), the reset-time guess (Pacific midnight) is unconfirmed, and **a real 429 is the only
+  truth**.
+- **`gemini-3.8-flash` timed out at both 15 s and 30 s**, while both Flash-Lite models answer in about a second.
+  Cause unknown. Treated as unusable for live calls. 3.6 Flash is the same family and untested.
+- **Default model list is now 3.1 Flash-Lite, then 3.5 Flash-Lite.** 2.5 Flash-Lite and 3.6 Flash stay in
+  `config.py` as commented-out options, "untested, 20 per day".
+- `smoke_gemini.py` has sent 5 of its maximum 6 requests; the last one is not being used.
 - **`classify_429` is still a guess** until we have a real 429 body. The first one seen is saved to
   `data/llm_first_429.txt`.
 - Consequence: the call must work from pre-written lines alone, and Gemini is only for moments the lines
@@ -119,6 +129,32 @@ One recording, one speaker, 7 sentences per run, so these are indicative only.
   not to cut speech in normal use.
 - Later: a client-side end-of-speech detector plus `commit` (measured 0.56 s median, including our 200 ms wait),
   as an optimisation with its own evaluation.
+
+## extract.py: facts used and their sources (1 Nov 2026)
+
+| Fact | Status |
+|---|---|
+| Indian mobile numbers are 10 digits starting 6, 7, 8 or 9 | Sourced: Wikipedia, "Mobile telephone numbering in India". Secondary source; TRAI's own plan not read. |
+| IFSC is 4 letters, "0", then 6 letters or digits | Sourced: Wikipedia and several bank pages agree; a few pages differ on details. Secondary. |
+| Bank account numbers are 9 to 18 digits | **Unverified.** Finance blogs repeat it; I found no RBI rule. Used only as a loose shape check. |
+| Known UPI handles (`ybl`, `oksbi`, `okhdfcbank`, `okicici`, `okaxis`, `paytm`) | **Unverified.** No official NPCI list found; the list is small and from memory. Our invented `mirageupi` lives in a separate synthetic-mode list. |
+
+Design notes: the extractor never replaces what was heard (guesses go in `suggested`), every finding carries its
+quote, arrival time and source index, and joining across transcripts uses when the next speech began
+(arrival time minus its audio length), because a forced or silence-based split delivers the second half only
+after it has been spoken.
+
+## Later list
+
+- Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
+- FSM, digit-dictation state: wait a longer, configurable silence (start around 1.5 to 2 s) before replying, and
+  join transcripts that arrive close together (`join_window_s` in `extract_intel`, 2.5 s to start).
+- `safety.py`: base the output gate on where digits came from (Uncle's fictional fact sheet or the caller's own
+  transcript, via a Finding's quote), not only on patterns, because Uncle must be able to read back the caller's digits.
+  `looks_like_real_mobile` is only a pattern check on whole digit runs.
+- Client-side end-of-speech detector with `commit` as an optimisation, with its own evaluation.
+- A larger `x-max-speech-s` (about 20 to 30 s) as a safety cap only.
+- Amounts in words ("पचास हज़ार") are not parsed.
 
 ## Decisions
 

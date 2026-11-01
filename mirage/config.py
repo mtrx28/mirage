@@ -32,16 +32,29 @@ class ModelBudget:
 MODELS: tuple[ModelBudget, ...] = (
     ModelBudget("3.1 flash-lite", "PASTE-ID-FOR-3.1-FLASH-LITE", per_minute=14, per_day=450),
     ModelBudget("3.5 flash-lite", "PASTE-ID-FOR-3.5-FLASH-LITE", per_minute=14, per_day=450),
-    ModelBudget("2.5 flash-lite", "PASTE-ID-FOR-2.5-FLASH-LITE", per_minute=9, per_day=18),
-    ModelBudget("3.6 flash", "PASTE-ID-FOR-3.6-FLASH", per_minute=4, per_day=18),
+    # Untested, 20 per day. Uncomment (and paste the id) only after trying them with scripts/smoke_gemini.py:
+    # ModelBudget("2.5 flash-lite", "PASTE-ID-FOR-2.5-FLASH-LITE", per_minute=9, per_day=18),
+    # ModelBudget("3.6 flash", "PASTE-ID-FOR-3.6-FLASH", per_minute=4, per_day=18),
+    #
+    # Not usable for live calls: gemini-3.8-flash timed out at both 15 s and 30 s (cause unknown).
 )
+
+
+# UPI handles (the part after @) the extractor recognises. UNVERIFIED: I found no official NPCI list, so this is
+# deliberately small and comes from memory. A handle that is not here is not "wrong", just not recognised.
+KNOWN_UPI_PROVIDERS: frozenset[str] = frozenset({"ybl", "oksbi", "okhdfcbank", "okicici", "okaxis", "paytm"})
+
+# Our own invented provider for the staged demo. Used ONLY when the extractor runs in synthetic mode.
+SYNTHETIC_UPI_PROVIDERS: frozenset[str] = frozenset({"mirageupi"})
 
 
 @dataclass(frozen=True)
 class LLMConfig:
     models: tuple[ModelBudget, ...] = MODELS
 
-    # When the daily counters reset. UNCONFIRMED: Pacific midnight is only a belief; change it when you know.
+    # When the daily counters reset. UNCONFIRMED: Pacific midnight is only a guess, and AI Studio's own count
+    # does not match what we saw (gemini-3.5-flash-lite answered while showing 501 of 500). Our counters are
+    # deliberately conservative; a real 429 is the only truth.
     reset_timezone: str = "America/Los_Angeles"
     reset_hour: int = 0
 
