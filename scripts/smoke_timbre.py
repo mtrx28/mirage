@@ -76,6 +76,16 @@ VOICE_LINE_LANGUAGE = "hi-en"
 # Timbre v3.0 voices to audition for Rajesh Uncle (the docs list names but no gender; judge by ear).
 CANDIDATE_VOICES = "Yashraj,Prakash,Devansh,Avinash"
 
+# Same line, but with two audio tags (angle brackets, lower case, as the docs show). Tags are billed
+# as characters, brackets included. 'tag-speed' compares: tags at normal speed, and no tags at speed 0.9
+# (the plain line at normal speed is what the 'voice-line' run already made).
+TAGGED_LINE = (
+    "<coughs> Hello, kaun bol raha hai beta? Awaaz thodi kam aa rahi hai, <pauses> zara dheere boliye. "
+    "Main chashma dhoondh raha hoon, ek minute rukiye."
+)
+SLOW_SPEED = 0.9                      # the docs allow 0.85 to 1.15
+SMALL_TEST_CREDIT_CAP = 2.0           # voice-line and tag-speed refuse to run above this estimate
+
 
 def build_text(sentences: list[str], tagged: bool) -> str:
     parts, total, i = [], 0, 0
@@ -89,9 +99,9 @@ def build_text(sentences: list[str], tagged: bool) -> str:
     return " ".join(parts)
 
 
-def synthesize(key: str, text: str, voice: str, language: str, rate: int) -> tuple[bytes, float | None, float]:
+def synthesize(key: str, text: str, voice: str, language: str, rate: int, speed: float = 1.0) -> tuple[bytes, float | None, float]:
     payload = {
-        "text": text, "model": MODEL, "voice": voice, "language": language, "speed": 1.0,
+        "text": text, "model": MODEL, "voice": voice, "language": language, "speed": speed,
         "audio_config": {
             "sample_rate": rate, "num_channels": 1, "sample_width": 2,
             "encoding": "linear_pcm", "container": "raw",
@@ -136,8 +146,9 @@ def save_audio(path: Path, audio: bytes, rate: int) -> float:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--case", default="all", choices=["all", *CASES, "voice-line"],
-                   help="which sample to speak; 'voice-line' is the short ~150-character line for comparing voices")
+    p.add_argument("--case", default="all", choices=["all", *CASES, "voice-line", "tag-speed"],
+                   help="which sample to speak; 'voice-line' is a short line for comparing voices, "
+                        "'tag-speed' tries audio tags and speed 0.9 on that line")
     p.add_argument("--voice", default="Yashraj", help="Timbre v3.0 voice name (e.g. Yashraj, Devansh, Avinash)")
     p.add_argument("--voices", default="",
                    help=f"comma-separated voices to try one after another, e.g. {CANDIDATE_VOICES} (overrides --voice)")
@@ -149,21 +160,30 @@ def main() -> None:
     args = p.parse_args()
 
     voices = [v.strip() for v in args.voices.split(",") if v.strip()] or [args.voice]
+    speeds: dict[str, float] = {}
     if args.case == "voice-line":
         names = ["voice-line"]
         texts = {"voice-line": VOICE_LINE}
         languages = {"voice-line": VOICE_LINE_LANGUAGE}
+    elif args.case == "tag-speed":
+        names = ["tags", "slow09"]
+        texts = {"tags": TAGGED_LINE, "slow09": VOICE_LINE}
+        languages = {n: VOICE_LINE_LANGUAGE for n in names}
+        speeds = {"slow09": SLOW_SPEED}
     else:
         names = list(CASES) if args.case == "all" else [args.case]
         texts = {n: build_text(CASES[n][1], CASES[n][2]) for n in names}
         languages = {n: CASES[n][0] for n in names}
     total = sum(len(t) for t in texts.values()) * len(voices)
     for n, t in texts.items():
-        print(f"\n[{n}] language={languages[n]} chars={len(t)} utf8_bytes={len(t.encode('utf-8'))}\n{t}")
+        print(f"\n[{n}] language={languages[n]} speed={speeds.get(n, 1.0)} chars={len(t)} utf8_bytes={len(t.encode('utf-8'))}\n{t}")
+    estimate = total / 1000 * EST_CREDITS_PER_1000_CHARS
     print(f"\nPlan: {len(names) * len(voices)} request(s), {total} characters, voices={','.join(voices)}, {args.sample_rate} Hz")
-    print(f"      blueprint estimate: ~{total / 1000 * EST_CREDITS_PER_1000_CHARS:.1f} credits (unverified)")
+    print(f"      estimate: ~{estimate:.2f} credits (measured rate ~2.7 per 1,000 characters)")
     if total > DEFAULT_CAP_CHARS and not args.allow_long:
         sys.exit(f"Budget guard: {total} characters exceeds {DEFAULT_CAP_CHARS}. Use fewer cases, or --allow-long.")
+    if args.case in ("voice-line", "tag-speed") and estimate > SMALL_TEST_CREDIT_CAP:
+        sys.exit(f"Budget guard: ~{estimate:.2f} credits is above the {SMALL_TEST_CREDIT_CAP:.0f}-credit cap for this test.")
     if args.dry_run:
         print("Dry run: nothing was sent.")
         return
@@ -177,7 +197,7 @@ def main() -> None:
         for voice in voices:
             print(f"\n== {n} / {voice} ==")
             try:
-                audio, first, wall = synthesize(key, texts[n], voice, language, args.sample_rate)
+                audio, first, wall = synthesize(key, texts[n], voice, language, args.sample_rate, speeds.get(n, 1.0))
             except httpx.HTTPError as e:
                 sys.exit(f"Network problem: {scrub(e)}")
             out = SMOKE_DIR / f"tts_{n}_{voice}_{datetime.now():%Y%m%d_%H%M%S}.wav"
@@ -188,7 +208,7 @@ def main() -> None:
             log_run(
                 script="smoke_timbre", label=f"{args.label}-{n}-{voice}", model=MODEL, audio_seconds=round(seconds, 1),
                 speech_seconds="", characters=len(texts[n]), first_result_s=first, wall_s=round(wall, 2),
-                balance_before="", balance_after="", note=f"voice={voice} lang={language} bytes={len(texts[n].encode('utf-8'))}",
+                balance_before="", balance_after="", note=f"voice={voice} lang={language} speed={speeds.get(n, 1.0)} bytes={len(texts[n].encode('utf-8'))}",
             )
             time.sleep(1)  # the TTS docs allow only one active request at a time
 
