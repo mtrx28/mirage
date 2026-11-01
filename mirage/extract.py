@@ -102,6 +102,9 @@ def _norm(raw: str) -> str:
     return unicodedata.normalize("NFC", raw).replace("‌", "").replace("‍", "").lower()
 
 
+norm_word = _norm   # public name, so other modules compare words the same way
+
+
 def _table(**groups: tuple[str, ...]) -> dict[str, str]:
     return {_norm(w): key for key, words in groups.items() for w in words}
 
@@ -499,6 +502,13 @@ def _find_spoken_vpas(toks, claimed, transcripts, synthetic_mode) -> list[tuple[
         local = "".join(reversed(local_parts))
         out.append((min(idxs), _vpa_finding(toks, idxs, local, provider_raw, transcripts, synthetic_mode)))
     return out
+
+
+def ends_with_digits(text: str) -> bool:
+    """True if the text ends in the middle of a number (its last word is a digit). The FSM uses this to decide
+    to wait longer before replying, because the caller may be mid-dictation."""
+    toks = [t for t in _tokenize(text, 0) if t.kind != "sep"]
+    return bool(toks) and toks[-1].kind in ("digit", "numeral")
 
 
 # --------------------------------------------------------------------------- the top-level call

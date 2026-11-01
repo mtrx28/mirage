@@ -181,6 +181,38 @@ after it has been spoken.
   and the owner's own, written without looking at the keyword lists (`tests/fixtures/stage_cases_user.txt`,
   "closer to a real caller"). Neither is an accuracy figure.
 
+## The brain: state machine and runner (1 Nov 2026)
+
+- `mirage/fsm.py` (`CallBrain`), `content/stage_rules.json`, `mirage/spoken.py`, `scripts/run_call.py`. The FSM picks the
+  stage and the tactic; the line comes from `content/lines.json`. The LLM fallback is **off by default** (in the FSM and
+  in the runner) and is tried only when no template tactic applies and the caller asked Uncle something no signal
+  covers. Its latency, a Gemini call plus the digit wait, is unmeasured, so it stays off until after E2.
+- **Stage rules:** weighted keywords for the current line (the previous line adds 0.3 of its weight), findings add a big
+  boost (a payment identifier -> S3, a case number -> S1), a minimum score of 2, a stickiness bonus for the current stage
+  (none for S0), S4 enterable only from S3/S4, one-step moves back only with a margin of 3. **A line with no keyword and
+  no finding never moves the stage and gets a generic stall.** All weights are guesses, not measurements.
+- **Two stage test sets, reported separately and neither an accuracy figure:** my invented set (41 lines, all match; it
+  was written with the keyword list in view, so it shows "the rules do what I designed") and the owner's set in
+  `tests/fixtures/stage_cases_user.txt` (still empty; "closer to a real caller"). Both are scored on the words of a
+  single line.
+- **Triggers are enforced.** `app_not_opening`, `otp_late` and `limit_exceeded_second_account` fire only after the caller
+  asked for an install, asked for a code, or gave payment details, each at most once per call, and not in S0 or S5.
+  `give_own_detail` is used only when the caller asks for one of Uncle's details; a credential Uncle has none of
+  (Aadhaar, PIN, ...) gets a stall.
+- **Digit mode** waits 1.8 s (config), after Uncle asks for digits or when the caller's last words are a half-finished
+  number. Transcripts within 2.5 s are joined by `extract_intel`. After Uncle asks for a case or account number the
+  extractor gets `expected` once.
+- **Read-back** says the first half of a caller's number (3 to 6 characters, never all of it), spoken in groups of 3, and
+  each reply records where every digit came from (the fact sheet field, or the finding's quote, transcript index and
+  time). At most two read-backs per kind per call; the same number is never read back twice.
+- **`needs_gate`:** a possible "are you a person or an AI?" or an emergency word returns a plan with no text. The
+  keyword lists over-trigger on purpose (a bare "ai" or "machine"); the gate will decide what is sincere.
+- **Spoken digits are UNVERIFIED with Timbre.** The TTS text-normalisation guide says Timbre reads bare digit runs digit by
+  digit near words like "account", reads 10-digit numbers in groups of 3-3-4, and always spells IFSC, OTP, UPI and KYC
+  letter by letter. It does not say what happens to number words ("ek do teen"). The default is words; the alternative is
+  spaced numerals (`FSMConfig.digit_style`). Compare both on one small Timbre test before any pre-rendering.
+- Read-back lines run past 80 characters once spoken digits are in them. That is expected (they are always synthesised live).
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

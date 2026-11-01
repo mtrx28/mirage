@@ -49,6 +49,25 @@ SYNTHETIC_UPI_PROVIDERS: frozenset[str] = frozenset({"mirageupi"})
 
 
 @dataclass(frozen=True)
+class FSMConfig:
+    """Starting values for the call brain. E2 will tune the waits; nothing here is measured yet."""
+    normal_wait_s: float = 0.0       # extra wait after the last transcript before Uncle replies (Prisma already waited ~0.5 s)
+    digit_wait_s: float = 1.8        # in digit-dictation mode: wait longer, the caller may be mid-number
+    join_window_s: float = 2.5       # transcripts this close together are one dictation (see extract.py)
+    recent_line_memory: int = 5      # a line is not repeated if it is among the last N lines said
+    max_alarm_uses: int = 2
+    max_stall_uses: int = 2
+    max_mishear_uses: int = 2
+    readback_min_digits: int = 3     # Uncle reads back the first half of a number: at least this many ...
+    readback_max_digits: int = 6     # ... and at most this many characters
+    max_readbacks: int = 6           # per call, so a long dictation cannot loop forever
+    digit_group: int = 3             # digits are spoken in groups of this size
+    digit_style: str = "words"       # "words" (ek, do, teen) or "numerals" (spaced digits); see the log: unverified with Timbre
+    llm_min_gap_turns: int = 3       # the LLM fallback is used at most once in this many turns
+    synthetic_mode: bool = False     # accept 00-prefixed phone numbers (staged demo only)
+
+
+@dataclass(frozen=True)
 class LLMConfig:
     models: tuple[ModelBudget, ...] = MODELS
 

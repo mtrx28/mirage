@@ -1,0 +1,80 @@
+{
+  "_about": "Keyword rules for the call brain. EDIT FREELY. Weights are guesses, not measurements. Each keyword counts once per utterance. A word may appear under several stages with different weights. Phrases are words separated by spaces and must appear together, in order. The stage meaning follows the blueprint: S0 the hook, S1 fear and authority, S2 the caller waits impatiently, S3 payment instructions, S4 pressure for speed, S5 giving up or hanging up.",
+  "min_score": 2.0,
+  "stickiness_by_stage": {"S0": 0.0, "S1": 1.0, "S2": 1.0, "S3": 1.0, "S4": 1.0, "S5": 1.0},
+  "stickiness_note": "A bonus the CURRENT stage gets, so one noisy line does not move the call. S0 gets none: it is only the opening, and a first line that carries both the hook and the authority claim should move on to S1. When scores tie, the later stage wins.",
+  "back_margin": 3.0,
+  "previous_utterance_weight": 0.3,
+  "finding_boosts": {
+    "payment_identifier": {"S3": 4.0},
+    "case": {"S1": 3.0}
+  },
+  "stages": {
+    "S0": {
+      "namaste": 0.5, "namaskar": 0.5, "hello": 0.5, "नमस्ते": 0.5, "हेलो": 0.5,
+      "parcel": 1.5, "पार्सल": 1.5, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5, "customs": 1.0,
+      "kyc": 1.5, "केवाईसी": 1.5, "bank se": 1.0, "aapke naam": 1.0, "naam se": 0.5,
+      "bol raha hoon": 1.0, "bol rahi hoon": 1.0, "calling from": 1.0
+    },
+    "S1": {
+      "arrest": 2.0, "giraftar": 2.0, "गिरफ्तार": 2.0, "warrant": 2.0, "वारंट": 2.0,
+      "cbi": 2.0, "सीबीआई": 2.0, "police": 1.5, "पुलिस": 1.5, "crime branch": 2.0,
+      "narcotics": 1.5, "drugs": 1.5, "ड्रग्स": 1.5, "money laundering": 2.0,
+      "case": 1.5, "केस": 1.5, "fir": 1.5, "officer": 1.0, "inspector": 1.0, "ऑफिसर": 1.0, "senior officer": 1.5,
+      "legal": 1.5, "court": 1.5, "कोर्ट": 1.5, "jail": 2.0, "जेल": 2.0,
+      "aapke khilaf": 2.0, "against you": 2.0,
+      "band ho jayega": 2.0, "band ho jaayega": 2.0, "block": 1.5, "blocked": 1.5, "suspend": 1.5, "verification": 1.0
+    },
+    "S2": {
+      "kitna time": 2.0, "kab tak": 1.5, "kahan gaye": 2.0, "kahan ho": 1.5, "line par": 1.5, "line pe": 1.5,
+      "hold": 1.0, "intezaar": 1.5, "wait": 1.0, "sun rahe hain": 1.0, "sun rahe ho": 1.0,
+      "jaldi dhoondhiye": 2.0, "jaldi": 1.0, "time waste": 1.0
+    },
+    "S3": {
+      "paise": 2.0, "rupaye": 1.5, "amount": 1.5, "lakh": 1.5, "payment": 3.0, "पेमेंट": 3.0,
+      "transfer": 2.0, "ट्रांसफर": 2.0, "bhejiye": 1.5, "bhej do": 1.5, "jama": 1.5, "deposit": 1.5,
+      "upi": 3.0, "यूपीआई": 3.0, "ifsc": 3.0, "आईएफएससी": 3.0, "account number": 2.5, "account": 1.0,
+      "अकाउंट": 1.0, "खाता": 1.0, "rbi": 1.5, "safe account": 3.0, "secure account": 3.0,
+      "verification amount": 3.0, "refundable": 1.5, "refund": 1.0, "qr": 1.5, "scan": 1.0,
+      "gpay": 2.5, "google pay": 2.5, "phonepe": 2.5, "paytm": 1.5
+    },
+    "S4": {
+      "jaldi": 1.5, "abhi": 1.0, "turant": 2.0, "foran": 2.0, "fauran": 2.0, "last chance": 2.0,
+      "warna": 1.5, "otherwise": 1.5, "time nahi": 1.5, "time nahin": 1.5, "der mat": 2.0, "der ho rahi": 1.5,
+      "payment kyun nahi": 2.0, "abhi tak nahi": 1.5, "kya hua": 1.0,
+      "install": 1.5, "download": 1.5, "anydesk": 2.5, "teamviewer": 2.5, "quicksupport": 2.5,
+      "screen share": 2.0, "link par": 1.5, "link": 1.0, "otp": 2.0, "ओटीपी": 2.0, "code batao": 2.0
+    },
+    "S5": {
+      "bye": 1.5, "goodbye": 2.0, "alvida": 2.0, "phone rakh": 2.0, "phone rakhta": 2.0, "फोन रख": 2.0,
+      "rakhta hoon": 1.5, "rakhti hoon": 1.5, "disconnect": 2.0, "call kat": 2.0, "call kaat": 2.0,
+      "baad mein baat": 2.0, "baad mein call": 2.0, "dubara call": 1.5, "band kar raha": 2.0,
+      "time waste": 2.0, "faltu": 1.5, "bekaar": 1.5, "bewakoof": 1.5, "chhod do": 1.0,
+      "theek hai baad mein": 2.0, "thik hai baad mein": 2.0
+    }
+  },
+  "scenario": {
+    "digital_arrest": ["parcel", "पार्सल", "courier", "customs", "fedex", "dhl", "cbi", "सीबीआई", "narcotics", "drugs", "arrest", "giraftar", "warrant", "police", "पुलिस", "passport", "crime branch", "money laundering"],
+    "bank_kyc": ["kyc", "केवाईसी", "account band", "account block", "account blocked", "account suspend", "atm card", "debit card", "pan update", "update karna", "bank se", "band ho jayega", "block ho"]
+  },
+  "signals": {
+    "ask_otp": ["otp", "ओटीपी", "verification code", "code batao", "code bataiye", "code bhejiye", "code boliye"],
+    "ask_install": ["install", "download", "anydesk", "teamviewer", "quicksupport", "screen share", "app kholiye", "app khol", "link par click", "link khol", "click kijiye", "click karo", "play store", "apk"],
+    "ask_credential": ["aadhaar", "aadhar", "आधार", "pan card", "pan number", "password", "pin", "cvv", "card number", "atm pin", "expiry"],
+    "ai_question": ["robot", "bot", "ai", "artificial", "machine", "computer", "insaan", "insan", "human", "रोबोट", "मशीन", "इंसान", "इन्सान", "कंप्यूटर", "एआई", "real person", "asli insaan", "chatgpt"],
+    "emergency": ["emergency", "ambulance", "hospital", "accident", "heart attack", "suicide", "died", "death", "maut", "इमरजेंसी", "एम्बुलेंस", "अस्पताल", "दुर्घटना", "हादसा", "आत्महत्या"],
+    "own_detail": {
+      "possessive": ["aapka", "aapki", "aapke", "apna", "apni", "apne", "your", "आपका", "आपकी", "आपके", "अपना", "अपनी", "अपने", "tumhara"],
+      "request": ["bataiye", "batao", "bataye", "boliye", "bolo", "dijiye", "do", "share", "send", "batana", "bata", "likhiye", "likhwaiye", "tell", "give", "de", "denge", "bhejiye"],
+      "facts": [
+        ["account", ["account", "अकाउंट", "खाता"]],
+        ["ifsc", ["ifsc", "आईएफएससी"]],
+        ["phone", ["phone", "mobile", "फोन", "मोबाइल"]],
+        ["address", ["pata", "address", "पता"]],
+        ["bank", ["bank", "बैंक"]],
+        ["name", ["naam", "name", "नाम"]]
+      ]
+    }
+  },
+  "goodbye_words_note": "S5 words above double as the goodbye detector."
+}

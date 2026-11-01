@@ -236,6 +236,34 @@ def lint(bank: LineBank, persona: Persona | None = None) -> list[str]:
     return problems
 
 
+def text_problems(text: str, max_chars: int = 100) -> list[str]:
+    """The content rules from lint(), for ONE piece of free text (used on anything a language model writes).
+    No slots are allowed here: the text must be final."""
+    problems: list[str] = []
+    if not text.strip():
+        problems.append("empty")
+    if len(text) > max_chars:
+        problems.append(f"{len(text)} characters; the limit is {max_chars}")
+    if not text.isascii():
+        problems.append("not plain Latin script")
+    if any(ch.isdigit() for ch in text) or LINK_OR_HANDLE.search(text) or "{" in text or "}" in text:
+        problems.append("contains a numeral, '@', a link or a brace")
+    tags = _TAG_RE.findall(text)
+    if len(tags) > 1 or any(t not in ALLOWED_TAGS for t in tags):
+        problems.append("bad tags")
+    if INFORMAL_FORMS.search(text):
+        problems.append("informal form")
+    if IDENTITY_WORDS.search(text):
+        problems.append("mentions being a person, human, robot or AI")
+    if ASKS_FOR_CREDENTIALS.search(text) or ASKS_FOR_MONEY.search(text):
+        problems.append("seems to ask for money or credentials")
+    if CLAIMS_AN_ACTION.search(text):
+        problems.append("seems to say Uncle already sent, installed, clicked or shared something")
+    if text.strip() and extract_intel([Transcript(text, 0.0)]):
+        problems.append("extract_intel finds a number, letters or UPI id in it")
+    return problems
+
+
 def review_table(bank: LineBank, persona: Persona | None = None) -> str:
     """A markdown table for reading and editing: id, state, tactic, scenario, line, length, tag."""
     persona = persona or load_persona(PERSONA_PATH)
