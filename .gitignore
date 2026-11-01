@@ -1,0 +1,18 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# private planning notes (not for the public repo)
+docs/blueprint.md
+
+# generated data: clips, call logs, packets, smoke-test output
+data/
+*.wav
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
