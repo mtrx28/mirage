@@ -58,16 +58,67 @@ Total spend for the whole smoke test: 14.05 credits of the 5,000 pool (about 0.2
 
 ### Gemini free tier
 
-- **Daily limit seen: 20 requests per day** (AI Studio rate-limit chart; the chart did not say which model).
-  Per-minute limits are 5 to 15 for the Flash and Flash-Lite models. Per-model daily numbers still to be read
-  from AI Studio, and the reset time (believed to be midnight Pacific) is still to be confirmed.
+Real limits from AI Studio (the earlier "20 per day" chart was only Gemini 3.8 Flash):
+
+| Model | Per minute | Per day | Note |
+|---|---|---|---|
+| Gemini 3.1 Flash-Lite | 15 | 500 | |
+| Gemini 3.5 Flash-Lite | 15 | 500 | used up on 1 Nov |
+| Gemini 2.5 Flash-Lite | 10 | 20 | |
+| Gemini 3.6 Flash | 5 | 20 | |
+| Gemini 3 Flash | 5 | 20 | |
+| Gemini 2.5 Flash | 5 | 20 | |
+| Gemini 3.8 Flash | 5 | 20 | used up on 1 Nov |
+| Gemma 4 26B and 31B | 30 | 14,400 | 16K tokens per minute; Hindi quality untested, so off |
+
+Gemini models allow 250K tokens per minute. The counters belong to my Google project, so requests made
+elsewhere also count. The daily reset time is not confirmed (believed to be midnight Pacific).
+
 - Consequence: the call must work from pre-written lines alone, and Gemini is only for moments the lines
   cannot handle.
+
+## Latency test: 7 short sentences, ~1 s pauses (1 Nov 2026, evening)
+
+Delay = time from the end of speech (found from loudness in the WAV) to the transcript arriving.
+One recording, one speaker, 7 sentences per run, so these are indicative only.
+
+| Variant | Median delay | Range | Note |
+|---|---|---|---|
+| baseline (`x-min-silence-ms` 500) | 0.98 s | 0.87 to 1.16 s | 7 sentences, 7 transcripts |
+| `x-min-silence-ms` 300 | about 0.70 s (hand-calculated) | 0.68 to 1.00 s | **split sentence 1 at its comma pause**: 8 transcripts, "नमस्ते।" then the rest |
+| baseline + `commit` 200 ms after speech ends | 0.56 s | 0.53 to 0.77 s | includes our own 200 ms wait; no split |
+| `x-max-speech-s` 6 on a 23 s unbroken clip | first transcript at 6.7 s, then every ~6 s | | forced cuts land mid-sentence and **split a phone number across two transcripts** |
+
+- Server processing for short utterances was only 240 to 450 ms (the 0.9 s seen earlier was for a 23 s utterance).
+  Most of the baseline delay is the 500 ms of silence the VAD waits for.
+- **Known bug in `scripts/smoke_latency.py`:** it matches transcripts to sentences in order, so one split
+  transcript shifts every row after it. The delay column printed for the 300 ms run is therefore wrong; the
+  0.70 s above was hand-calculated from the transcript times. We will fix this when we build the real E2
+  harness, not before.
+- **"About 1.0 s reply" is a design target, not a number to publish.** It is a best case: one clean recording,
+  template lines and cached audio (so no LLM or TTS wait). We publish only what E2 measures.
+- `commit` needs us to detect the end of speech ourselves (a client-side detector), which does not exist yet.
+- Digits came back both as Devanagari words and as English words ("zero zero"), and "case number" came
+  back as "केस नंबर" in some runs: the extractor must accept all of these.
+- Letters were weak again on the same clip ("miraj UPI", "N A I R G"). Still n=1 clean clip, not a benchmark.
+- Voice audition (Yashraj, Prakash, Devansh, Avinash, one 129-character Hinglish line): first audio 0.30 to
+  0.39 s, about 7.5 s of speech each. By ear, Prakash and Avinash both sound natural; not picked yet.
+
+### Open items from the latency test
+
+- The `connected` message still reports `sample_rate: 16000` although we send `x-sample-rate: 8000`. Unexplained;
+  transcripts are fine.
+- Later: try a larger `x-max-speech-s` (about 20 to 30 s) purely as a safety cap against endless monologues,
+  not to cut speech in normal use.
+- Later: a client-side end-of-speech detector plus `commit` (measured 0.56 s median, including our 200 ms wait),
+  as an optimisation with its own evaluation.
 
 ## Decisions
 
 - **No 1.5 s p50 promise.** The blueprint's target is not reachable with about 1.3 s of STT latency alone before
   the LLM and TTS. I will not promise a number; I will publish the p50 and p95 we measure (E2), with the method.
+- **STT setting: `x-min-silence-ms` 500 (the default).** 300 ms split a sentence at a comma, and the 6 s cap
+  split a phone number across transcripts, so neither is used.
 - **Silent filler clips** will carry perceived responsiveness while the real reply is prepared.
 - **Fake identifiers**: invented varied digits, an unreal UPI provider (`@mirageupi`), a fake IFSC bank code.
   The "mobile numbers never start with 5" claim is unverified (no source found), so the convention is still open.
