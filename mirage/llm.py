@@ -40,6 +40,10 @@ class LLMError(Exception):
     """A request failed. The message never contains the API key."""
 
 
+class LLMTimeout(LLMError):
+    """No reply within the timeout. Says nothing about quota: the model may be slow or the request stuck."""
+
+
 class RateLimitError(LLMError):
     """HTTP 429. `body` is the server's raw text, kept so classify_429 can read it."""
 
@@ -128,6 +132,8 @@ class GeminiClient:
         headers = {"x-goog-api-key": self._key, "Content-Type": "application/json"}
         try:
             r = self._http.post(GEMINI_URL.format(model=model_id), headers=headers, json=body, timeout=timeout_s)
+        except httpx.TimeoutException as e:
+            raise LLMTimeout(f"timeout: {type(e).__name__}") from None
         except httpx.HTTPError as e:
             raise LLMError(f"network error: {type(e).__name__}") from None  # type only: no URL, no details
         try:

@@ -14,7 +14,7 @@ import pytest
 
 from mirage.config import LLMConfig, ModelBudget, default_config
 from mirage.llm import (
-    GeminiClient, LLMError, LLMRouter, RateLimitError, UsageStore, atomic_write_text,
+    GeminiClient, LLMError, LLMRouter, LLMTimeout, RateLimitError, UsageStore, atomic_write_text,
     build_router, classify_429, extract_text,
 )
 
@@ -405,6 +405,13 @@ def test_the_key_goes_in_a_header_and_never_in_the_url_or_an_error(tmp_path):
     with pytest.raises(RateLimitError) as limit:
         limited.generate("some-model", "sys", "hi", 3.0)
     assert "SECRET123" not in limit.value.body
+
+
+def test_a_timeout_is_its_own_error_and_not_a_rate_limit():
+    slow = GeminiClient("SECRET123", http=FakeHttp(error=httpx.ReadTimeout("slow SECRET123")))
+    with pytest.raises(LLMTimeout) as err:
+        slow.generate("some-model", "sys", "hi", 3.0)
+    assert not isinstance(err.value, RateLimitError) and "SECRET123" not in str(err.value)
 
 
 def test_a_model_id_cannot_smuggle_extra_url_parts():

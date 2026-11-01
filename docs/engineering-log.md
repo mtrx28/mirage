@@ -74,6 +74,13 @@ Real limits from AI Studio (the earlier "20 per day" chart was only Gemini 3.8 F
 Gemini models allow 250K tokens per minute. The counters belong to my Google project, so requests made
 elsewhere also count. The daily reset time is not confirmed (believed to be midnight Pacific).
 
+- **`gemini-3.1-flash-lite` confirmed working** with `scripts/smoke_gemini.py` (two requests, HTTP 200). That
+  confirms the key, the `x-goog-api-key` header and the model ID string.
+- **`gemini-3.8-flash` timed out** (`ReadTimeout`, 15 s timeout) instead of returning a 429. The cause is
+  unknown: it could be a slow model, a request that hangs when the quota is exhausted, or a timeout that is too
+  short. Not a quota finding. To be retried with a longer timeout.
+- **`classify_429` is still a guess** until we have a real 429 body. The first one seen is saved to
+  `data/llm_first_429.txt`.
 - Consequence: the call must work from pre-written lines alone, and Gemini is only for moments the lines
   cannot handle.
 
