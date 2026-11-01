@@ -139,6 +139,9 @@ One recording, one speaker, 7 sentences per run, so these are indicative only.
 | Bank account numbers are 9 to 18 digits | **Unverified.** Finance blogs repeat it; I found no RBI rule. Used only as a loose shape check. |
 | Known UPI handles (`ybl`, `oksbi`, `okhdfcbank`, `okicici`, `okaxis`, `paytm`) | **Unverified.** No official NPCI list found; the list is small and from memory. Our invented `mirageupi` lives in a separate synthetic-mode list. |
 
+**Do not quote the extract test count as accuracy.** The round-trip tests only prove the extractor agrees with its
+own digit table. They say nothing about how well Prisma hears digits; that is what E1 will measure.
+
 Design notes: the extractor never replaces what was heard (guesses go in `suggested`), every finding carries its
 quote, arrival time and source index, and joining across transcripts uses when the next speech began
 (arrival time minus its audio length), because a forced or silence-based split delivers the second half only

@@ -30,8 +30,8 @@ class ModelBudget:
 #
 # TODO(you): copy each exact model id string from AI Studio ("Get code" shows it) over the PASTE-... values.
 MODELS: tuple[ModelBudget, ...] = (
-    ModelBudget("3.1 flash-lite", "PASTE-ID-FOR-3.1-FLASH-LITE", per_minute=14, per_day=450),
-    ModelBudget("3.5 flash-lite", "PASTE-ID-FOR-3.5-FLASH-LITE", per_minute=14, per_day=450),
+    ModelBudget("3.1 flash-lite", "gemini-3.1-flash-lite", per_minute=14, per_day=450),   # confirmed in smoke runs
+    ModelBudget("3.5 flash-lite", "gemini-3.5-flash-lite", per_minute=14, per_day=450),   # confirmed in smoke runs
     # Untested, 20 per day. Uncomment (and paste the id) only after trying them with scripts/smoke_gemini.py:
     # ModelBudget("2.5 flash-lite", "PASTE-ID-FOR-2.5-FLASH-LITE", per_minute=9, per_day=18),
     # ModelBudget("3.6 flash", "PASTE-ID-FOR-3.6-FLASH", per_minute=4, per_day=18),
