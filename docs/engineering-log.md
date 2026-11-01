@@ -147,6 +147,40 @@ quote, arrival time and source index, and joining across transcripts uses when t
 (arrival time minus its audio length), because a forced or silence-based split delivers the second half only
 after it has been spoken.
 
+## The brain: persona and lines (1 Nov 2026)
+
+- `content/persona.json` is Rajesh Uncle's fact sheet. Every value is invented and flagged. **New synthetic phone
+  numbers start with 0000** (Uncle's is `0000274915`). A 00 start is the international dialling prefix, so
+  `0038274915` would read as +38 274915; the recorded clip number `0047138296` has the same pattern (+47, Norway).
+  As far as I know no country code starts with 0, so 0000 cannot be read as an international number. **That
+  reasoning is UNVERIFIED (no source found).** The old clip stays as a fixture; new test strings use 0000. The
+  persona checker enforces the 0000 start. The account number is 14 digits so it cannot pass for an
+  Aadhaar-style 12-digit number. There are no Aadhaar, PAN, OTP, PIN, password or card facts in the sheet.
+- **The fake IFSC prefix `MIRG` is UNVERIFIED as "not a real bank code".** A search on 1 Nov 2026 found no bank
+  with that prefix (it only appears inside branch names), but I could not check RBI's full list.
+- `content/lines.json` has 58 template lines in 14 tactics. A checker (`python -m mirage.lines`, also run as
+  tests) enforces: 40 to 80 characters with slots filled, 4 to 6 variants per tactic, at most one tag per line
+  (7 lines carry one), no numerals or "@", **zero findings when each line is run through `extract_intel`**
+  (so "ek minute" is fine but no real number can get in), no claim to be a person, human, robot or AI, no request
+  to the caller for money or credentials, and no "I already sent/installed/clicked/shared". These are safety
+  nets; the owner still reads every line. The tests also plant bad lines to prove the checker catches them.
+- After the owner's review: "beta" was in 23 of 58 lines (it would sound scripted), now in 13, and the checker
+  enforces at most a third. Register is decided on purpose: polite forms (aap, boliye, bataiye, dijiye, ruk jaiye)
+  to everyone because the caller claims to be an officer, with "beta" as the only familiar word; informal forms
+  (bolo, batao, ruko, dekho, tum ...) fail the checker. "darja" became "post". Obstacle tactics now carry a
+  `trigger` in `lines.json` (`app_not_opening` after an install request, `otp_late` after a code request,
+  `limit_exceeded_second_account` after payment instructions) and `give_own_detail` is only used when the caller
+  asks for one of Uncle's details; the FSM will enforce these.
+- **Until the safety gate exists, a sincere "are you a person or an AI?" or a detected emergency must not get a
+  stall line.** The FSM returns a reply plan marked `needs_gate` with no text, and the runner prints that
+  clearly. The gate piece will define the real behaviour.
+- **No voice call is to be wired up until the gate exists.**
+- The LLM fallback stays off by default in both the FSM and the runner. Its latency (a Gemini call plus the digit
+  wait) is not measured, so it is turned on only after E2.
+- Two stage-detection test sets will be reported separately: my invented set ("the rules do what I designed")
+  and the owner's own, written without looking at the keyword lists (`tests/fixtures/stage_cases_user.txt`,
+  "closer to a real caller"). Neither is an accuracy figure.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

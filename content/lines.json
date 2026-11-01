@@ -1,0 +1,162 @@
+{
+  "_about": "Template lines for Rajesh Uncle, in Latin-script Hinglish. EDIT FREELY, then run:  python -m mirage.lines  (prints the review table and any problems). A variant is either a plain string (scenario 'any') or {\"scenario\": \"digital_arrest\" | \"bank_kyc\", \"text\": \"...\"}. Slots in {braces} are filled by the program: {what} (a thing Uncle asks for), {readback} (the start of a number the caller said), {fact_label} and {fact_value} (from persona.json). Register (decided on purpose): Uncle uses polite forms to everyone (aap, boliye, bataiye, dijiye, ruk jaiye) because the caller claims to be an officer; 'beta' is the only familiar word and at most a third of the lines may use it. A tactic with a \"trigger\" is only used after the caller did that thing (asked to install an app, asked for a code, gave payment instructions, asked for Uncle's own detail), so a line never complains about an app nobody mentioned. Rules the checker enforces: 40-80 characters, 4-6 variants per tactic, 40-60 lines in all, no digits and no @, no line that extract_intel finds a number in, only <coughs> <pauses> <sigh> (at most one per line, about 12 lines in all), never claim to be a human or an AI, never ask the caller for money or credentials, never say Uncle already sent, installed, clicked or shared anything.",
+  "slots": {
+    "what": [
+      {"key": "case_number", "text": "case number", "expected": "case"},
+      {"key": "account_number", "text": "account number", "expected": "account"},
+      {"key": "upi_id", "text": "UPI ID", "expected": null},
+      {"key": "ifsc", "text": "IFSC code", "expected": null},
+      {"key": "account_holder", "text": "account holder ka naam", "expected": null},
+      {"key": "officer_name", "text": "officer ka naam", "expected": null},
+      {"key": "badge_number", "text": "badge number", "expected": null}
+    ]
+  },
+  "tactics": {
+    "greet_confused": {
+      "states": ["S0"],
+      "goal": "Pick up slowly and confused; learn who is calling.",
+      "variants": [
+        "Hello? Haan ji, kaun bol raha hai? Zara awaaz saaf boliye.",
+        "Haan hello, awaaz thodi kam aa rahi hai, kaun bol raha hai?",
+        "Hello hello? Kaun sahab bol rahe hain, zara bataiye.",
+        "<coughs> Haan ji boliye beta, main sun raha hoon."
+      ]
+    },
+    "mishear_name": {
+      "states": ["S0"],
+      "goal": "Mishear the name so the caller repeats it (organisation, caller name).",
+      "variants": [
+        "Kya? Aapka naam phir se boliye, awaaz nahin aa rahi.",
+        "Kaun? Naam dobara boliye beta, kaan thoda kam sunte hain.",
+        "Achha achha, par naam kya bataya aapne? Phir se boliye.",
+        "Arre, line kharab hai. Aapka naam aur department phir se boliye."
+      ]
+    },
+    "alarm": {
+      "states": ["S1"],
+      "goal": "Cooperative alarm: sound scared and ask what to do.",
+      "variants": [
+        {"scenario": "digital_arrest", "text": "Hai Ram! Mere naam par parcel? Main toh dar gaya, ab kya karun?"},
+        {"scenario": "digital_arrest", "text": "Police? CBI? Arre baap re, maine toh kuch galat nahin kiya."},
+        {"scenario": "bank_kyc", "text": "KYC? Mera account band ho jayega kya? Main kya karun beta?"},
+        {"scenario": "bank_kyc", "text": "Hai Ram, bank se phone? Mera account toh band nahin hoga na?"}
+      ]
+    },
+    "ask_identity": {
+      "states": ["S1"],
+      "goal": "Get the claimed agency, officer name and badge.",
+      "variants": [
+        "Aapka poora naam aur post boliye, main likh leta hoon.",
+        "Aap kaun se department se hain? Naam aur badge dheere boliye.",
+        "Pehle apna naam aur ID bataiye, phir aage dekhte hain.",
+        "Aap kis office se bol rahe hain? Naam spelling ke saath boliye."
+      ]
+    },
+    "ask_detail_slow": {
+      "states": ["S1", "S3"],
+      "goal": "Ask for one specific detail, slowly, so the caller repeats it (case number, UPI ID, account, IFSC).",
+      "variants": [
+        "Ji, {what} dheere dheere boliye, main likh raha hoon.",
+        "Zara ruk jaiye, pen utha leta hoon. Ab {what} phir se boliye.",
+        "Achha, {what} thoda thoda boliye, main kaagaz par likhta hoon.",
+        "Mujhe sunai kam deta hai, {what} thoda dheere bataiye na beta.",
+        "<pauses> Haan, ab boliye, {what} kya hai? Ruk ruk kar boliye."
+      ]
+    },
+    "readback_partial": {
+      "states": ["S1", "S3"],
+      "goal": "Read the first part of what the caller said back slowly and ask for the rest again.",
+      "variants": [
+        "Achha, ye likha: {readback}. Aage ka phir se boliye beta?",
+        "Ruk jaiye, abhi tak {readback} likha hai. Baaki phir se boliye.",
+        "Sahi sun raha hoon na? {readback}. Uske aage kya tha?",
+        "Haan, {readback}... bas yahin tak likha. Baaki dobara bataiye.",
+        "Main dohrata hoon: {readback}. Aage ke number phir boliye na."
+      ]
+    },
+    "stall_look_for_things": {
+      "states": ["S2"],
+      "goal": "Delay: glasses, pen, charger. Two variants also ask for a callback number.",
+      "variants": [
+        "<coughs> Ek minute, chashma nahin mil raha, abhi aaya.",
+        "Pen kahan rakh diya... ek minute, kaagaz bhi dhoondhna padega.",
+        "Battery kam hai, aapka direct number bata dijiye, likh leta hoon.",
+        "<sigh> Ek minute, bahu se poochta hoon charger kahan hai."
+      ]
+    },
+    "give_own_detail": {
+      "states": ["S2", "S3"],
+      "trigger": "asked_for_own_detail",
+      "goal": "ONLY when the caller asks for one of Uncle's own details: answer with the FICTIONAL one from persona.json. Never offered unprompted.",
+      "variants": [
+        "Achha, aapko mera {fact_label} chahiye? Likh lijiye: {fact_value}.",
+        "Mera {fact_label}? Ek minute, yaad karke batata hoon: {fact_value}.",
+        "Haan ji, {fact_label} poochh rahe hain na? {fact_value}, likh liya?",
+        "Ji, mera {fact_label} yeh hai: {fact_value}. Theek hai na?"
+      ]
+    },
+    "willing_ask_payment": {
+      "states": ["S3"],
+      "goal": "Sound willing and ask where to send the money, so the caller gives payment details.",
+      "variants": [
+        "Theek hai, main paise bhejne ko taiyaar hoon, kahan bhejun?",
+        "Agar yahi karna zaroori hai toh bataiye, paise kahan dalne hain?",
+        "Haan ji, jo aap kahenge karunga. UPI se bhejun ya account mein?",
+        "Main pensioner hoon beta, par kar dunga. Kis account mein bhejun?"
+      ]
+    },
+    "app_not_opening": {
+      "states": ["S4"],
+      "trigger": "asked_to_install_app",
+      "goal": "ONLY after the caller asked Uncle to install or open an app: friction, and ask which app (remote-access app name).",
+      "variants": [
+        "Aapka bataya hua app khul hi nahin raha, bas ghoomta rehta hai.",
+        "Phone mein app daalna aata nahin, kaun sa app hai, naam boliye.",
+        "<sigh> App par sirf ghoomta hua gola aa raha hai, ab kya karun?",
+        "Woh app download hi nahin ho raha, network bahut kamzor hai beta."
+      ]
+    },
+    "otp_late": {
+      "states": ["S4"],
+      "trigger": "asked_for_otp",
+      "goal": "ONLY after the caller asked for a code: friction, the message has not arrived. Uncle never shares a code.",
+      "variants": [
+        "Abhi tak koi message nahin aaya, OTP kab tak aayega?",
+        "Phone mein message aaya nahin, bank wale der kar rahe hain beta.",
+        "Dekhiye, OTP wala message abhi tak nahin aaya, thoda ruk jaiye.",
+        "<coughs> Mera message box khaali hai, kuch aaya hi nahin abhi."
+      ]
+    },
+    "limit_exceeded_second_account": {
+      "states": ["S4"],
+      "trigger": "asked_for_payment",
+      "goal": "ONLY after the caller gave payment instructions: friction, the limit is crossed; ask for a second account or UPI ID.",
+      "variants": [
+        "Itni raqam ki limit nahin hai, koi doosra account hai kya beta?",
+        "Bank kehta hai limit paar ho gayi, kisi aur account mein bhejun?",
+        "Ye wala account nahin chal raha, doosra account ya UPI bataiye.",
+        "Limit ki dikkat aa rahi hai, alag account number de sakte hain?"
+      ]
+    },
+    "goodbye_wrap": {
+      "states": ["S5"],
+      "goal": "Wrap-up in persona: end the call politely.",
+      "variants": [
+        "Achha achha beta, abhi neend aa rahi hai, kal baat karte hain.",
+        "Bahu bula rahi hai khaane ko, phir baat karte hain, Ram Ram.",
+        "<sigh> Thak gaya hoon beta, baaki kal dekh lenge, theek hai?",
+        "Theek hai theek hai, main baad mein dekhta hoon, Ram Ram beta."
+      ]
+    },
+    "generic_stall": {
+      "states": ["any"],
+      "goal": "Used when nothing matches: keep the caller talking without inventing a stage.",
+      "variants": [
+        "Haan? Kya kaha beta? Zara dheere boliye, sunai nahin diya.",
+        "Achha achha... samajh nahin aaya, ek baar phir se boliye.",
+        "Hello? Line kat kat ke aa rahi hai, kya bola aapne?",
+        "Haan ji haan ji, main sun raha hoon, aap boliye aage."
+      ]
+    }
+  }
+}

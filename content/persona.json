@@ -1,0 +1,41 @@
+{
+  "_about": "Rajesh Uncle's fact sheet. EVERY value here is INVENTED. No real person, number, account or bank. Edit freely, but keep it obviously fictional. The only digits Uncle may ever say come from this sheet or from reading back what the caller said.",
+  "fictional": true,
+  "character": "68-year-old retired government clerk, speaks Hindi with English banking words, polite, a little deaf, easily worried",
+  "facts": {
+    "name": {
+      "label": "naam",
+      "value": "Rajesh Kumar",
+      "kind": "text"
+    },
+    "bank": {
+      "label": "bank ka naam",
+      "value": "Mirage Test Bank",
+      "kind": "text"
+    },
+    "address": {
+      "label": "pata",
+      "value": "Flat 12, Mirage Apartments, Demo Nagar",
+      "kind": "text"
+    },
+    "phone": {
+      "label": "phone number",
+      "value": "0000274915",
+      "kind": "digits",
+      "note": "Synthetic convention for NEW numbers: 10 digits starting 0000, never a real mobile number (real ones start 6 to 9). A 00 start is the international dialling prefix (0038... would read as +38...), and as far as I know no country code starts with 0, so 0000 cannot be read as an international number. That reasoning is UNVERIFIED (no source found)."
+    },
+    "account": {
+      "label": "account number",
+      "value": "40039182746513",
+      "kind": "digits",
+      "note": "14 invented digits. Deliberately not 12 digits, so it cannot be mistaken for an Aadhaar-style number."
+    },
+    "ifsc": {
+      "label": "IFSC code",
+      "value": "MIRG0000456",
+      "kind": "code",
+      "unverified": "I searched on 1 Nov 2026 and found no bank whose IFSC starts with MIRG (it only appears inside branch names), but I could not check the full RBI list. So 'MIRG is not a real bank code' is UNVERIFIED."
+    }
+  },
+  "never_in_this_sheet": ["aadhaar", "pan", "otp", "pin", "password", "cvv", "card number"]
+}

@@ -1,0 +1,13 @@
+# Stage-detection cases written by the project owner, as a real caller might say them.
+# Write these WITHOUT looking at content/stage_rules.json or the keyword lists.
+#
+# One case per line:   STAGE | what the scammer says
+# STAGE is S0, S1, S2, S3, S4 or S5 (see the stall state machine in the blueprint). Lines starting with # are ignored.
+# Hinglish in Latin or Devanagari script, as Prisma would write it.
+#
+# Example (delete this line once you have written your own):
+# S1 | aapke naam se ek parcel pakda gaya hai jisme drugs mile hain
+#
+# The stage-detection test (written with the state machine) reports this file's results SEPARATELY from the
+# invented test set. Neither is an accuracy figure: the invented set shows that "the rules do what I designed",
+# this one shows how the rules fare on something "closer to a real caller".
