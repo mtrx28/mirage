@@ -41,7 +41,9 @@ INVENTED = [
     ("S0", "hello sir namaste main FedEx courier se bol raha hoon"),
     ("S0", "aapke naam se ek parcel aaya hai"),
     ("S0", "main bank se bol raha hoon aapka KYC update karna hai"),
-    ("S0", "customs se parcel ke baare mein call hai"),
+    # Rules change 2 Nov 2026, made with set 2 in view: customs is an authority word (S1, 1.5, blueprint stage 2), so
+    # "parcel" alone (S0, 1.5) cannot carry this line past the minimum of 2. It claims no stage.
+    (None, "customs se parcel ke baare mein call hai"),
     ("S1", "aapke khilaf arrest warrant nikla hai"),
     ("S1", "CBI officer ne aapka case register kiya hai"),
     ("S1", "ye money laundering ka case hai, police aapko giraftar karegi"),

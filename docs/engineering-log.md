@@ -334,6 +334,25 @@ and leaves them out of the in-scope score. Written up in `docs/safety.md` as "on
 (frozen by hash, like set 1); set 3, `tests/fixtures/stage_cases_heldout_friend.txt`, written by the friend who plays the
 scammer, empty, "held out". The report prints only counts for set 3 until the owner says its misses may be shown.
 
+### `customs` moved to authority (2 Nov 2026): a rules change made with set 2 in view
+
+At the owner's decision (the blueprint is the reference and the invented test line was the wrong part): `customs` moved from
+S0 (1.0) to **S1, weight 1.5**, below the minimum of 2, so "parcel" (S0) or "case" (S1) decide the stage when it appears in a
+line. The invented line "customs se parcel ke baare mein call hai" now expects **no stage claimed**, not S0: "parcel" alone
+is 1.5, below the minimum, so it cannot carry the line. **This change was made with set 2 in view, so set 2 stays labelled a
+dev set** (it was already frozen as one).
+
+Regression check against the rules before this change:
+
+| | Before | After | What changed |
+|---|---|---|---|
+| Invented set (41) | 40 of 41 against the new expectation (the old line fails) | 41 | only the one line whose expectation changed |
+| Owner set 1 (27) | 25 | 25 | nothing |
+| Owner set 2 (18) | 5 | **6** | "customs mein aapka parcel rok diya gaya hai aur case banega" now S1 (right); "parcel release ... customs fee bhejni padegi" went from a wrong S0 claim to no claim |
+| Replay of the 3 practice calls | 1 generic stall | 1 | stages and tactics identical |
+
+Nothing that passed before fails now. Set 3 (the friend's) was not read or scored.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

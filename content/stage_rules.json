@@ -12,14 +12,14 @@
   "stages": {
     "S0": {
       "namaste": 0.5, "namaskar": 0.5, "hello": 0.5, "नमस्ते": 0.5, "हेलो": 0.5,
-      "parcel": 1.5, "पार्सल": 1.5, "drugs": 1.5, "ड्रग्स": 1.5, "narcotics": 1.5, "passport": 1.0, "sim card": 1.0, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5, "customs": 1.0,
+      "parcel": 1.5, "पार्सल": 1.5, "drugs": 1.5, "ड्रग्स": 1.5, "narcotics": 1.5, "passport": 1.0, "sim card": 1.0, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5,
       "kyc": 1.5, "केवाईसी": 1.5, "bank se": 1.0, "aapke naam": 1.0, "naam se": 0.5,
       "bol raha hoon": 1.0, "bol rahi hoon": 1.0, "calling from": 1.0,
       "department": 1.0, "delivery": 1.0, "pending": 1.0, "order": 1.0
     },
     "S1": {
       "arrest": 2.0, "giraftar": 2.0, "गिरफ्तार": 2.0, "warrant": 2.0, "वारंट": 2.0,
-      "cbi": 2.0, "सीबीआई": 2.0, "call transfer": 1.5, "police": 1.5, "पुलिस": 1.5, "crime branch": 2.0,
+      "cbi": 2.0, "सीबीआई": 2.0, "customs": 1.5, "call transfer": 1.5, "police": 1.5, "पुलिस": 1.5, "crime branch": 2.0,
       "money laundering": 2.0,
       "case": 1.5, "केस": 1.5, "fir": 1.5, "officer": 1.0, "inspector": 1.0, "ऑफिसर": 1.0, "senior officer": 1.5,
       "legal": 1.5, "court": 1.5, "कोर्ट": 1.5, "jail": 2.0, "जेल": 2.0,
