@@ -745,6 +745,46 @@ Also guesses: unmute holdoff 0.3 s, playback fallback margin 2 s, mute grace 1.5
   clean silence; real time to first audio in a call; whether Uncle's lines are chosen sensibly on unseen speech (the stage rules
   scored 12 of 20 on the friend's held-out lines); behaviour at a reconnect or at 15 minutes; `keyterms` stay off.
 
+## Voice path, solo check of the full loop (owner, 2026-11-02): results and five findings
+
+**Results.** "Check audio" passed: 75 microphone chunks arrived while the tone played, so capturing and playing at once works in this
+browser. One call, 7 turns, every line through the gate. `mute_anomalies`, `capture_stalls`, `playback_done_missing` and `unspoken_turns`
+were all 0, so silence reached Prisma as silence (no phantom speech while Uncle talked), the page kept sending microphone audio while he
+spoke, and the page reported playback every time. Heard-to-audible was 0.69 to 0.72 s on ordinary turns (Timbre first byte 250 to
+266 ms) and 2.14 to 2.28 s on digit-mode turns, which includes the 1.81 s digit wait. The case number 47291 and the phone number
+0000274196 were captured, with quotes. One call, one speaker, one microphone: these are what happened, not rates or percentiles.
+
+**Fixed (UI only):** "Check audio" printed a red "-99 dBFS ... very low or silent" in a quiet room although the microphone worked.
+Browsers apply noise suppression and gain control, so a quiet room can read -90 dBFS or lower. The line is now plain information ("a quiet
+room reads very low; that is normal; this is only a rough check"), never red; only samples that are exactly zero get a gentle hint. The
+red/not-red decision for the capture-while-playing check is unchanged (it counts chunks, which is the reliable part). A test runs the page's
+own code with a silent microphone and fails on the old wording.
+
+**Findings, logged and NOT fixed** (the owner wants to see how often they happen with a real caller first):
+
+1. **Slow single-digit dictation is a weak spot for Prisma.** Reading a number one digit at a time with long pauses, Prisma cut it into
+   about 12 tiny transcripts ("0000", "दो।", "चार।", "चार।", "ए।", "नौ छह।") and some digits were wrong ("दो सात चार एक" came out as
+   "दो चार चार ए"). This is the speech service, not our pacing. E1 will measure digit capture on real calls. One sample so far.
+2. **Uncle spoke twice during that dictation** (turns 6 and 7), because the pauses between the pieces were longer than the 1.8 s digit
+   wait, so the reply came due between pieces. The hold only covers an utterance that Prisma has announced and not yet transcribed;
+   between two finished pieces there is nothing open, and only the digit wait protects the number.
+3. **The gate replaced a read-back mid-dictation.** At turn 6 the brain wanted to read back "0000" but the gate refused it ("digits
+   '0000' do not match any finding with that quote"), because by then the extractor had joined the pieces into an unlabelled
+   `00002741`. The gate is stricter than the extractor, which is the safe direction. But the read-back flow assumes digits arrive whole;
+   when they arrive in many pieces the brain's read-back and the extractor's final finding disagree, the gate swaps in a stall, and
+   Uncle said a generic "Haan ji? Samajh nahin aaya" in the middle of the dictation.
+4. **A stray intel card, `0000244` (unlabelled, needs confirmation).** It came from a misheard repeat of the labelled phone number.
+   The fragment clean-up drops a fragment that is contained in a longer number, or equal to a labelled one, but a misheard repeat
+   (different digits) is neither, so it stays as its own card.
+5. **Stray words between digits become their own transcripts** ("No", "अच्छा"). Each one is a transcript with no digits, which also
+   ends the "caller is mid-number" state and lets the reply come due.
+
+What these have in common: the weak point is slow digit-by-digit dictation, on both sides (Prisma splits and mishears it; our turn
+logic assumes a number comes in one or two pieces). Possible later directions, none started: a longer digit wait or one that restarts
+on each digit piece; letting the hold treat "ended in a digit, then a stray word" as still mid-number; reading back only when the
+pieces have settled; matching a misheard repeat to a labelled number by edit distance. Which of these matters depends on how often
+real callers dictate this way, which tomorrow's session will show.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

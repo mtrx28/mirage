@@ -60,3 +60,29 @@ This is a known limitation of the first version. A real scammer who talks over U
   7 days at server start. `data/` is gitignored. Transcripts contain what the caller said, so tell your friend they are kept.
 - **Staged demo.** The page carries a "STAGED DEMO: synthetic data" banner. All data is invented.
 - **Replaying a call offline** (no network, no audio): `python -m mirage.replay data/calls/<id>`.
+
+## Checklist for a session with a friend playing the caller
+
+**Before**
+- A good microphone for the caller (not a headphone microphone). Headphones are for Uncle's voice only, so his voice does not feed back.
+- Run **Check audio (free)** and read the lines: sound output "running", microphone chunks while the tone played, and "Capturing and
+  playing at the same time works". The room-level line is only a rough check: a quiet room reads very low and that is normal.
+- Raw audio saving is OFF (leave `MIRAGE_SAVE_AUDIO` unset) unless your friend has agreed to have their voice recorded. Say that
+  transcripts are kept as text in `data/calls/` either way.
+- The ledger matches the dashboard: note the dashboard figure, then `python -m mirage.credits sync <figure> --requests <count>`.
+- Tell your friend: wait for Uncle to finish before speaking (the page says "Your turn" when it is safe), and pause between
+  numbers' digits no longer than about a second and a half if they want Uncle to wait for the rest.
+- Start the server with `python -m mirage.server --max-minutes 3` (or a longer time for a longer call) and open http://127.0.0.1:8000.
+
+**During**
+- Keep a notepad of moments that felt wrong, each with the time on the page (the "minutes held" clock): Uncle talked over the caller,
+  a long silence, a strange or repeated line, a number that came out wrong, a notice on the page.
+- Note when your friend talked over Uncle on purpose or by accident; that speech is lost by design.
+
+**After**
+- Replay each call (free, offline): `python -m mirage.replay data/calls/<id>`. Compare it with the notepad; look in `summary.json` at
+  `mute_anomalies`, `capture_stalls`, `playback_done_missing` and `unspoken_turns`.
+- Delete any saved audio: remove `data/audio/` (anything older than 7 days is deleted at server start anyway). Decide with your friend
+  whether to keep the call folders in `data/calls/` (they hold the transcripts).
+- Sync the ledger to the dashboard again (`python -m mirage.credits sync <figure> --requests <count>`), and note how far the estimate
+  leaned from the dashboard.

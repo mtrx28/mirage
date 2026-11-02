@@ -480,8 +480,13 @@ async function checkAudio() {
     const during = phases.tone.chunks >= expectedTone * 0.6;
     say("Microphone chunks while the tone played: " + phases.tone.chunks + " (expected about " + expectedTone + "). " +
         (during ? "Capturing and playing at the same time works." : "FAILED: the microphone stopped arriving while sound played. Uncle's calls will not work properly in this browser."), !during);
-    say("Microphone level in the quiet second: " + level(phases.quiet).toFixed(0) + " dBFS" +
-        (level(phases.quiet) < -75 ? " (very low or silent: check the microphone)" : " (ok)") + ". With the tone: " + level(phases.tone).toFixed(0) + " dBFS.", level(phases.quiet) < -75);
+    // The room level is information, never an alarm: browsers apply noise suppression and gain control, so a quiet room
+    // can read -90 dBFS or lower while the microphone works perfectly. Only a real test (speaking) proves the microphone.
+    const quiet = level(phases.quiet);
+    say("Room level in the quiet second: " + quiet.toFixed(0) + " dBFS (with the tone: " + level(phases.tone).toFixed(0) + " dBFS). " +
+        "A quiet room reads very low; that is normal. This is only a rough check" +
+        (quiet < -150 ? " (it read exactly zero: if the call hears nothing when you speak, check the microphone choice in the browser)" : "") +
+        ". To test the microphone itself, start a call and speak: the Conversation panel shows what was heard.");
     say("Did you hear a short soft tone in your headphones? If not, sound output is not working even though the page thinks it is.");
   } catch (err) {
     say(micProblem(err), true);

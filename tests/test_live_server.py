@@ -294,3 +294,33 @@ def test_the_page_builds_everything_from_text_and_never_from_html():
     html = (ROOT / "mirage" / "web" / "index.html").read_text(encoding="utf-8")
     for needed in ("STAGED DEMO: synthetic data", "Hang up", "Check audio", "Wait for Uncle to finish", "latencyBody", "intelCards"):
         assert needed in html
+
+
+def test_check_audio_treats_a_very_quiet_room_as_normal_not_as_an_alarm():
+    """A quiet room read -99 dBFS in the owner's check and showed a red warning though the microphone worked."""
+    r = node("""
+      const delivered = [];
+      let node = null, phaseChunks = 0;
+      ctxStub.AudioWorkletNode = class { constructor() { node = this; this.port = {}; } connect() {} disconnect() {} };
+      ctxStub.AudioContext = class {
+        constructor() { this.state = "running"; this.sampleRate = 48000; this.destination = {}; this.currentTime = 0; this.audioWorklet = { addModule: async () => {} }; }
+        async resume() {} close() { return Promise.resolve(); }
+        createMediaStreamSource() { return { connect() {} }; }
+        createGain() { return { gain: {}, connect() {} }; }
+        createOscillator() { return { frequency: {}, connect() {}, start() {}, stop() {} }; }
+      };
+      ctxStub.navigator = { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [] }) } };
+      // each wait delivers 50 microphone chunks per second of "digital quiet" (all zeros), as the owner's browser did
+      ctxStub.setTimeout = (f, ms) => { for (let i = 0; i < ms / 20; i++) node.port.onmessage({ data: new Int16Array(960).buffer }); Promise.resolve().then(f); return 0; };
+      (async () => {
+        await run("checkAudio()");
+        const lines = store.audioCheck.children.map((c) => ({ text: c.textContent, bad: c.className === "warn" }));
+        console.log(JSON.stringify({ lines }));
+      })();
+    """)
+    texts = " ".join(l["text"] for l in r["lines"])
+    assert "Capturing and playing at the same time works" in texts
+    assert "only a rough check" in texts and "quiet room reads very low; that is normal" in texts
+    assert "very low or silent" not in texts
+    assert not any(l["bad"] for l in r["lines"])                                    # nothing is red when capture and playback work
+    assert any("exactly zero" in l["text"] for l in r["lines"])                      # truly zero samples get a gentle hint, not an alarm
