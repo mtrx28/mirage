@@ -117,14 +117,40 @@ def raw_stage(rules: Rules, text: str) -> str | None:
     return best if scores[best] >= rules.min_score else None
 
 
-def line_scores(rules: Rules, text: str, synthetic_mode: bool = False) -> dict[str, float]:
-    """Scores for ONE line the way the brain sees it with no history: its words plus what the extractor finds in it."""
-    scores, _ = score_text(rules, text)
-    for f in extract_intel([Transcript(text, 0.0)], synthetic_mode=synthetic_mode):
+@dataclass(frozen=True)
+class LineScore:
+    scores: dict[str, float]
+    reasons: list[str]
+    evidence: bool              # did THIS line contain any stage keyword or finding?
+    current_stage_hit: bool     # ... and did any of it point at the stage the call is already in?
+
+
+def score_line(rules: Rules, text: str, findings, prev_text: str = "", current: str | None = None) -> LineScore:
+    """THE scoring function. The brain calls it for every turn and the stage tests call it for every test line, so
+    the two cannot drift apart. Words of this line, plus a little of the previous line's weight, plus a boost for
+    each finding (a payment identifier points at S3, a case number at S1)."""
+    scores, hits = score_text(rules, text)
+    evidence = any(hits.values())
+    if prev_text:
+        prev_scores, _ = score_text(rules, prev_text)
+        scores = {s: scores[s] + rules.prev_weight * prev_scores[s] for s in STAGES}
+    reasons = [f"{s}: " + ", ".join(h) for s, h in hits.items() if h]
+    current_stage_hit = current is not None and bool(hits[current])
+    for f in findings:
         boost = finding_boost(rules, f)
         if boost:
-            scores[boost[0]] += boost[1]
-    return scores
+            stage, amount = boost
+            scores[stage] += amount
+            evidence = True
+            current_stage_hit = current_stage_hit or stage == current
+            reasons.append(f"{stage}: finding {f.kind} +{amount:g}")
+    return LineScore(scores, reasons, evidence, current_stage_hit)
+
+
+def line_scores(rules: Rules, text: str, synthetic_mode: bool = False) -> dict[str, float]:
+    """Scores for ONE line with no history: the same score_line the brain uses, fed the extractor's findings."""
+    findings = extract_intel([Transcript(text, 0.0)], synthetic_mode=synthetic_mode)
+    return score_line(rules, text, findings).scores
 
 
 def line_stage(rules: Rules, text: str) -> tuple[str | None, str | None, float]:
@@ -343,21 +369,9 @@ class CallBrain:
         self._record_intel(findings)
         signals = detect_signals(self.rules, text)
 
-        scores, hits = score_text(self.rules, text)
-        evidence = any(hits.values())
-        prev_scores, _ = score_text(self.rules, st.prev_text) if st.prev_text else ({s: 0.0 for s in STAGES}, {})
-        scores = {s: scores[s] + self.rules.prev_weight * prev_scores[s] for s in STAGES}
-        reasons = [f"{s}: " + ", ".join(h) for s, h in hits.items() if h]
-        current_stage_hit = bool(hits[st.stage])
-        for f in findings:
-            boost = finding_boost(self.rules, f)
-            if boost:
-                stage, amount = boost
-                scores[stage] += amount
-                evidence = True
-                current_stage_hit = current_stage_hit or stage == st.stage
-                reasons.append(f"{stage}: finding {f.kind} +{amount:g}")
-        decision = decide_stage(self.rules, st.stage, scores, reasons, evidence, current_stage_hit)
+        scored = score_line(self.rules, text, findings, st.prev_text, st.stage)
+        decision = decide_stage(self.rules, st.stage, scored.scores, scored.reasons, scored.evidence,
+                                scored.current_stage_hit)
 
         if st.scenario == "undecided":
             st.scenario = detect_scenario(self.rules, text) or "undecided"

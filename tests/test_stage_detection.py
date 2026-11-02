@@ -3,8 +3,9 @@
   - The INVENTED set was written by me, with the keyword list in front of me. A pass means "the rules do what I
     designed". It says nothing about real callers.
   - The OWNER sets are written by the project owner, as a scammer would talk, without looking at the keyword list:
-      * stage_cases_user.txt     the first set. Its untouched score (11 of 27, words only) is in the engineering log.
-                                 Once keywords are changed after reading it, it is a development set, not a fair test.
+      * stage_cases_user.txt     "OWNER set 1 (dev set, tuned, not a test)". Its untouched score (11 of 27) is in the
+                                 engineering log. Keywords were then tuned with it in view, so it is FROZEN: a test
+                                 below fails if its cases change, and it must never be tuned against again.
       * stage_cases_heldout.txt  reserved for the next honest measurement; do not look at the rules before writing it.
     Their result is "closer to a real caller".
 
@@ -15,6 +16,8 @@ in test_fsm.py. The owner sets are REPORTED, never asserted, so a poor score can
 from __future__ import annotations
 
 from pathlib import Path
+
+import hashlib
 
 import pytest
 
@@ -153,8 +156,8 @@ def test_owner_set_files_are_well_formed():
 
 
 @pytest.mark.parametrize("path, title", [
-    (OWNER_FILE, "OWNER set 1 (yours, first set: seen; untouched score 11 of 27 is in the log)"),
-    (HELDOUT_FILE, "OWNER set 2 (yours, held out)"),
+    (OWNER_FILE, "OWNER set 1 (dev set, tuned, not a test; untouched score was 11 of 27, see the log)"),
+    (HELDOUT_FILE, "OWNER set 2 (held out: the honest test)"),
 ])
 def test_owner_set_report(request, path, title):
     cases = parse_owner_file(path)
@@ -176,3 +179,48 @@ def test_owner_set_parser_reads_cases_and_rejects_bad_lines(tmp_path):
         good.write_text(bad + "\n", encoding="utf-8")
         with pytest.raises(AssertionError):
             parse_owner_file(good)
+
+
+# ---------------------------------------------------------------- freezing set 1, and one scoring function
+
+SET1_SHA256 = "dc25134c78e612c75d9dc2b0653973c0baf01db3f86f032f106aa19b9614c789"
+
+
+def test_owner_set_1_is_frozen_after_tuning():
+    cases = [line.strip() for line in OWNER_FILE.read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.strip().startswith("#")]
+    digest = hashlib.sha256(chr(10).join(cases).encode("utf-8")).hexdigest()
+    assert digest == SET1_SHA256, (
+        "stage_cases_user.txt (owner set 1) was tuned against and is frozen as a dev set. If you want new cases, "
+        "write a new file; do not edit this one.")
+
+
+def test_the_brain_and_the_stage_test_use_the_same_scoring_function(monkeypatch):
+    import mirage.fsm as fsm
+    from mirage.fsm import CallBrain
+
+    calls = []
+    original = fsm.score_line
+
+    def spy(*args, **kwargs):
+        calls.append(args[1])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(fsm, "score_line", spy)
+    CallBrain().hear("arrest warrant hai", 1.0)
+    brain = CallBrain()
+    brain.hear("arrest warrant hai", 1.0)
+    brain.respond()
+    assert calls == ["arrest warrant hai"]                    # the brain scored its turn with score_line
+    fsm.line_stage(RULES, "UPI ID bataiye")
+    assert calls[-1] == "UPI ID bataiye"                      # and so does the stage test helper
+
+
+def test_a_fresh_brain_and_the_stage_helper_give_identical_scores_on_every_test_line():
+    from mirage.fsm import CallBrain, line_scores
+    owner = [text for _, _, text in parse_owner_file(OWNER_FILE)]
+    for text in [t for _, t in INVENTED] + owner:
+        brain = CallBrain()
+        brain.state.turn = 1                                  # skip the opening greeting, which ignores the line
+        brain.hear(text, 1.0, 2.0)
+        assert brain.respond().stage.scores == line_scores(RULES, text), text

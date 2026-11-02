@@ -504,7 +504,7 @@ def test_weak_evidence_for_the_stage_the_call_is_already_in_gets_that_stages_tac
 
 def test_weak_evidence_for_a_different_stage_does_not_move_it_and_still_stalls():
     brain = at_stage("S1")
-    turn = say(brain, "Please line par rahiye, main details check karta hoon")    # S2 word at 1.5: below the minimum
+    turn = say(brain, "Thoda wait karna padega")    # one S2 word at 1.0: below the minimum
     assert turn.stage.stage == "S1" and turn.plan.tactic == "generic_stall"
 
 
@@ -516,3 +516,36 @@ def test_more_ways_of_asking_for_uncles_own_detail(ask, key):
     assert turn.plan.tactic == "give_own_detail", turn.plan
     assert load_persona().fact(key).label in turn.plan.text
     assert_traceable(turn.plan, brain)
+
+
+
+# ---------------------------------------------------------------- needs_gate matches whole words only
+
+ORDINARY_LINES = [   # INVENTED ordinary lines: none of them may ask the gate for anything
+    "Mai bank se bol raha hoon, aapka account band hai", "Kai baar bataya hai aapko", "Bhai sahab, kaise hain aap",
+    "Chai peeni hai kya", "Maine kaha tha ki paisa jaldi bhejiye", "Main aapki madad ke liye hoon", "Mail aaya hai kya",
+    "Aaj ka din kaisa hai", "Rain ho rahi hai, isliye der hui", "Aap wait kijiye, hai na", "Simple si baat hai",
+    "है", "यह मेरा घर है", "कई बार बताया है", "मैं बैंक से बोल रहा हूँ", "आपका खाता बंद है", "ऐसा मत कीजिए",
+    "भाई साहब, कैसे हैं आप", "बीमा कराया है", "मशीनी तरीके से नहीं, ध्यान से सुनिए", "डेथ सर्टिफिकेट नहीं चाहिए",
+]
+GATE_LINES = [
+    ("are you a robot?", "ai_question"), ("Are you AI?", "ai_question"), ("are you A.I.?", "ai_question"),
+    ("kya aap insaan hain", "ai_question"), ("क्या आप रोबोट हैं", "ai_question"), ("क्या आप एआई हैं", "ai_question"),
+    ("क्या आप ए आई हैं", "ai_question"), ("is this a machine talking", "ai_question"),
+    ("ambulance bulao", "emergency"), ("इमरजेंसी है", "emergency"), ("accident ho gaya hai", "emergency"),
+]
+
+
+@pytest.mark.parametrize("line", ORDINARY_LINES)
+def test_ordinary_hinglish_never_asks_for_the_gate(line):
+    from mirage.fsm import detect_signals, load_rules
+    assert not {"ai_question", "emergency"} & set(detect_signals(load_rules(), line).names)
+    brain = at_stage("S1")
+    assert not say(brain, line).plan.needs_gate
+
+
+@pytest.mark.parametrize("line, reason", GATE_LINES)
+def test_real_identity_questions_and_emergencies_still_ask_for_the_gate(line, reason):
+    brain = at_stage("S1")
+    turn = say(brain, line)
+    assert turn.plan.needs_gate and turn.plan.gate_reason == reason

@@ -293,6 +293,25 @@ def _keyword_before(toks: list[_Tok], first: int, claimed: set[int], window: int
     return (best[1], best[2]) if best else None
 
 
+AMOUNT_UNITS = {_norm(w) for w in (
+    "rupaye", "rupaya", "rupiye", "rupees", "rupee", "rs", "inr", "lakh", "lakhs", "lac", "hazaar", "hazar", "hajar",
+    "thousand", "crore", "karod", "रुपये", "रुपए", "रुपया", "हज़ार", "हजार", "लाख", "करोड़", "करोड")}
+AMOUNT_PREFIXES = {_norm(w) for w in ("rs", "inr", "₹")}
+
+
+def _amount_unit(toks: list[_Tok], run: "_Run") -> str | None:
+    """If the number is money (a unit right after it, or Rs / INR / the rupee sign right before), return that word."""
+    k = run.last + 1                                  # the unit must come right after: "..., Rs 500" is a new phrase
+    if k < len(toks) and toks[k].norm in AMOUNT_UNITS:
+        return toks[k].raw
+    k = run.first - 1
+    if k >= 1 and toks[k].kind == "break" and toks[k].raw == "." and toks[k - 1].norm in AMOUNT_PREFIXES:   # "Rs. 500"
+        return toks[k - 1].raw
+    if k >= 0 and toks[k].norm in AMOUNT_PREFIXES:
+        return toks[k].raw
+    return None
+
+
 def _fits(expected: str, n: int) -> bool:
     return {"phone": n in (10, 11, 12), "account": 9 <= n <= 18, "case": n >= 3}.get(expected, False)
 
@@ -557,6 +576,15 @@ def extract_intel(
         found.append((idxs[0], f))
 
     for run in _build_runs(toks, claimed):
+        unit = _amount_unit(toks, run)
+        if unit:
+            # "500 rupaye", "Rs 5000", "do lakh": an amount of money, not an identifier. Recorded as its own kind
+            # (with quote and time) so the evidence packet can show what was demanded; never read back, never classified.
+            idxs = [k for k in range(run.first, run.last + 1) if toks[k].kind in ("digit", "numeral", "mult")]
+            f = _make(toks, idxs, transcripts, kind="amount", value=run.digits, valid=True,
+                      reason=f"an amount (next to {unit!r})", confidence="heard", needs_confirmation=False)
+            found.append((run.first, f))
+            continue
         if len(run.digits) < min_run:
             continue
         kind, confidence, candidates = _classify(run, toks, claimed, expected)

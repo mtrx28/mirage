@@ -394,3 +394,31 @@ def test_random_digit_strings_split_across_two_transcripts_join_back():
         findings = extract_intel([Transcript(a, 10.0, 1.0), Transcript(b, 11.0, 1.0)])
         assert [f.value for f in findings] == [digits], (a, b)
         assert findings[0].source_index == 0 and " | " in findings[0].quote
+
+
+
+# ---------------------------------------------------------------- amounts of money are not identifiers
+
+@pytest.mark.parametrize("text, value", [
+    ("Aapko 500 rupaye verification ke liye transfer karne hain", "500"),     # from the owner's practice call
+    ("Rs 5000 bhejiye", "5000"), ("Rs. 5000 bhejiye", "5000"), ("INR 2500 jama kijiye", "2500"),
+    ("₹ 2500 jama kijiye", "2500"), ("₹2500", "2500"),
+    ("aapko do lakh rupaye bhejne honge", "2"), ("paanch hazaar dena hoga", "5"),
+    ("५०० रुपये", "500"), ("ek crore", "1"),
+])
+def test_a_number_next_to_a_money_word_is_an_amount_with_quote_and_time(text, value):
+    findings = extract_intel([Transcript(text, 7.5)])
+    assert [(f.kind, f.value) for f in findings] == [("amount", value)]
+    f = findings[0]
+    assert f.valid and not f.needs_confirmation and f.quote and f.t == 7.5 and f.source_index == 0
+
+
+def test_a_bare_number_is_still_ambiguous_and_money_words_alone_are_nothing():
+    assert one("500").kind == "ambiguous"
+    assert kinds("sau rupaye ka kaam hai") == []
+    assert kinds("account number hai 500") == ["account"]
+
+
+def test_an_amount_beside_a_real_identifier_does_not_swallow_it():
+    findings = extract_intel([Transcript("account number hai ek do teen chaar paanch chhe saat aath nau, Rs 500 bhejiye", 1.0)])
+    assert [(f.kind, f.value) for f in findings] == [("account", "123456789"), ("amount", "500")]

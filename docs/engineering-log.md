@@ -231,6 +231,45 @@ keyword of the stage the call was already in (one hook word in S0) got a generic
 stage test ignored the extractor's findings that the brain uses; the signal for "tell me your address" missed
 "aap kahan rehte hain" and "confirm".
 
+### Stage keywords tuned (2 Nov 2026); owner set 1 is now "OWNER set 1 (dev set, tuned, not a test)"
+
+| Measured on | Before tuning (after the two scoring fixes) | After adding general words |
+|---|---|---|
+| Owner set 1 (27 lines), one line at a time | 13 of 27 (11 of 27 untouched, before any change) | **25 of 27**, but this set was in view while tuning, so this is NOT a test result |
+| Invented set (41 lines) | 41 of 41 | 41 of 41 |
+| Replay of the owner's three practice calls (27 turns) | 8 generic stalls; call 2 reached only S4, call 3 only S4 | 1 generic stall; call 2 now reaches S2, S3, S4, S5 and call 3 reaches S5 |
+
+- **What was added:** general words, not whole lines: S0 department, delivery, pending, order; S1 suspicious, complaint,
+  inquiry, investigation, illegal, fraud, against, expire(d), pakda, seized, notice, station, penalty (and two
+  Devanagari ones); S2 "hold kijiye", rukiye, rahiye, network; S4 "jaldi kijiye", "jaldi karo", offer, limited, khatam;
+  S5 "call cut", "call band", chhodo, "dobara call". Weights are guesses.
+- **The minimum score stays at 2.0.** Lowering it to 1.5 was measured: before tuning it lifted set 1 from 13 to 19 of 27 but
+  broke two invented cases (a lone "jaldi" claimed S4 and a lone "case" claimed S1), and it barely changed the stage path of
+  the three practice calls (it only turned 3 stalls into tactics). After tuning it added just one line (26 of 27) and still
+  broke the same two. Not worth it.
+- **Still missed, left alone on purpose:** "Aapka bank KYC expire ho gaya hai" (hook word and fear word tie at 1.5, below the
+  minimum) and "Hello hello sir, sun rahe ho kya" (a greeting that looks like "are you there?"). A single line like these
+  carries no clear stage; claiming none is the safe answer.
+- **What leaked from set 1, precisely.** Before this tuning, no stage weight was tuned on set 1. Three things used it:
+  (1) two lines informed the own-detail signal cues ("Ab apna account number confirm kijiye", which added the request
+  words "confirm", "verify", "enter", and "aap kahan rehte hain?", which added the direct cues "kahan rehte", "kis bank",
+  "naam kya"); (2) reading its results led to fixing two defects in how the TEST scored lines (a tie went to the wrong
+  stage; the extractor's findings were ignored), which moved the score from 11 to 13 without changing any keyword;
+  (3) this tuning, which changed the keywords with the set in view. **Set 1 is frozen** (a test checks its content
+  hash). The honest "closer to a real caller" number will come from the held-out set
+  (`tests/fixtures/stage_cases_heldout.txt`, still empty; written by the owner, never tuned against).
+- **One scoring function:** the brain and the stage tests both call `score_line`, so they cannot drift apart again (a test
+  proves it and compares the brain's scores with the helper's on every test line).
+- **Amounts:** a number next to a money word (rupaye, rupees, Rs, INR, the rupee sign, lakh, hazaar, crore) is recorded as
+  kind `amount` with its quote and time, not as an `ambiguous` number. It is never read back or classified. Only a digit
+  directly followed by the unit counts, so "..., Rs 500" does not turn the account number before it into an amount.
+  Amounts written fully in words ("pachas hazaar") are still not parsed: only "do lakh" gives "2".
+- **needs_gate matching is on whole words** (a test with 21 ordinary Hinglish and Devanagari lines, including hai, mai,
+  kai, bhai, है, कई, must not trigger it, and 11 real questions and emergencies still do). "A.I." and "ए आई" were added.
+- `scripts/smoke_digits_tts.py` (not yet run) compares four ways of writing a digit read-back for Prakash (digit words,
+  spaced numerals, plain numerals, Devanagari digit words), 242 characters, about 0.65 credits. After listening, the
+  owner decides `FSMConfig.digit_style`.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

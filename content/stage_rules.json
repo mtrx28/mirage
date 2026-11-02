@@ -14,7 +14,8 @@
       "namaste": 0.5, "namaskar": 0.5, "hello": 0.5, "नमस्ते": 0.5, "हेलो": 0.5,
       "parcel": 1.5, "पार्सल": 1.5, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5, "customs": 1.0,
       "kyc": 1.5, "केवाईसी": 1.5, "bank se": 1.0, "aapke naam": 1.0, "naam se": 0.5,
-      "bol raha hoon": 1.0, "bol rahi hoon": 1.0, "calling from": 1.0
+      "bol raha hoon": 1.0, "bol rahi hoon": 1.0, "calling from": 1.0,
+      "department": 1.0, "delivery": 1.0, "pending": 1.0, "order": 1.0
     },
     "S1": {
       "arrest": 2.0, "giraftar": 2.0, "गिरफ्तार": 2.0, "warrant": 2.0, "वारंट": 2.0,
@@ -23,12 +24,14 @@
       "case": 1.5, "केस": 1.5, "fir": 1.5, "officer": 1.0, "inspector": 1.0, "ऑफिसर": 1.0, "senior officer": 1.5,
       "legal": 1.5, "court": 1.5, "कोर्ट": 1.5, "jail": 2.0, "जेल": 2.0,
       "aapke khilaf": 2.0, "against you": 2.0,
-      "band ho jayega": 2.0, "band ho jaayega": 2.0, "block": 1.5, "blocked": 1.5, "suspend": 1.5, "verification": 1.0
+      "band ho jayega": 2.0, "band ho jaayega": 2.0, "block": 1.5, "blocked": 1.5, "suspend": 1.5, "verification": 1.0,
+      "suspicious": 2.0, "संदिग्ध": 2.0, "complaint": 1.5, "शिकायत": 1.5, "inquiry": 1.5, "investigation": 1.5, "जांच": 1.5, "illegal": 1.5, "fraud": 1.0, "against": 1.0, "expire": 1.5, "expired": 1.5, "pakda": 1.0, "seized": 1.5, "notice": 1.5, "station": 1.0, "penalty": 1.5
     },
     "S2": {
       "kitna time": 2.0, "kab tak": 1.5, "kahan gaye": 2.0, "kahan ho": 1.5, "line par": 1.5, "line pe": 1.5,
       "hold": 1.0, "intezaar": 1.5, "wait": 1.0, "sun rahe hain": 1.0, "sun rahe ho": 1.0,
-      "jaldi dhoondhiye": 2.0, "jaldi": 1.0, "time waste": 1.0
+      "jaldi dhoondhiye": 2.0, "jaldi": 1.0, "time waste": 1.0,
+      "hold kijiye": 2.0, "rukiye": 1.0, "rahiye": 1.0, "network": 1.0
     },
     "S3": {
       "paise": 2.0, "rupaye": 1.5, "amount": 1.5, "lakh": 1.5, "payment": 3.0, "पेमेंट": 3.0,
@@ -43,14 +46,16 @@
       "warna": 1.5, "otherwise": 1.5, "time nahi": 1.5, "time nahin": 1.5, "der mat": 2.0, "der ho rahi": 1.5,
       "payment kyun nahi": 2.0, "abhi tak nahi": 1.5, "kya hua": 1.0,
       "install": 1.5, "download": 1.5, "anydesk": 2.5, "teamviewer": 2.5, "quicksupport": 2.5,
-      "screen share": 2.0, "link par": 1.5, "link": 1.0, "otp": 2.0, "ओटीपी": 2.0, "code batao": 2.0
+      "screen share": 2.0, "link par": 1.5, "link": 1.0, "otp": 2.0, "ओटीपी": 2.0, "code batao": 2.0,
+      "jaldi kijiye": 2.0, "jaldi karo": 2.0, "offer": 1.0, "limited": 1.0, "khatam": 1.5
     },
     "S5": {
       "bye": 1.5, "goodbye": 2.0, "alvida": 2.0, "phone rakh": 2.0, "phone rakhta": 2.0, "फोन रख": 2.0,
       "rakhta hoon": 1.5, "rakhti hoon": 1.5, "disconnect": 2.0, "call kat": 2.0, "call kaat": 2.0,
       "baad mein baat": 2.0, "baad mein call": 2.0, "dubara call": 1.5, "band kar raha": 2.0,
       "time waste": 2.0, "faltu": 1.5, "bekaar": 1.5, "bewakoof": 1.5, "chhod do": 1.0,
-      "theek hai baad mein": 2.0, "thik hai baad mein": 2.0
+      "theek hai baad mein": 2.0, "thik hai baad mein": 2.0,
+      "call cut": 2.0, "call band": 2.0, "chhodo": 1.0, "dobara call": 1.5
     }
   },
   "scenario": {
@@ -61,7 +66,7 @@
     "ask_otp": ["otp", "ओटीपी", "verification code", "code batao", "code bataiye", "code bhejiye", "code boliye"],
     "ask_install": ["install", "download", "anydesk", "teamviewer", "quicksupport", "screen share", "app kholiye", "app khol", "link par click", "link khol", "click kijiye", "click karo", "play store", "apk"],
     "ask_credential": ["aadhaar", "aadhar", "आधार", "pan card", "pan number", "password", "pin", "cvv", "card number", "atm pin", "expiry"],
-    "ai_question": ["robot", "bot", "ai", "artificial", "machine", "computer", "insaan", "insan", "human", "रोबोट", "मशीन", "इंसान", "इन्सान", "कंप्यूटर", "एआई", "real person", "asli insaan", "chatgpt"],
+    "ai_question": ["robot", "bot", "ai", "artificial", "machine", "computer", "insaan", "insan", "human", "रोबोट", "मशीन", "इंसान", "इन्सान", "कंप्यूटर", "एआई", "real person", "asli insaan", "chatgpt", "chat gpt", "a i", "ए आई"],
     "emergency": ["emergency", "ambulance", "hospital", "accident", "heart attack", "suicide", "died", "death", "maut", "इमरजेंसी", "एम्बुलेंस", "अस्पताल", "दुर्घटना", "हादसा", "आत्महत्या"],
     "own_detail": {
       "possessive": ["aapka", "aapki", "aapke", "apna", "apni", "apne", "your", "आपका", "आपकी", "आपके", "अपना", "अपनी", "अपने", "tumhara"],
