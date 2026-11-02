@@ -83,6 +83,7 @@ function cleanup() {
   if (ctx) { ctx.close().catch(() => {}); ctx = null; }
   els.start.disabled = false;
   els.hangup.disabled = true;
+  speakEls.button.disabled = speaking;                        // the voice test is available again once the call is over
 }
 
 function onServerMessage(msg) {
@@ -133,6 +134,7 @@ async function startCall() {
   showProblem("");
   els.transcript.textContent = "";
   els.start.disabled = true;
+  speakEls.button.disabled = true;                            // no voice test during a call
   ended = false;
   setStatus("Asking for the microphone...");
   try {
@@ -186,6 +188,103 @@ function hangUp() {
     cleanup();
   }
 }
+
+// ---------------------------------------------------------------- the voice test (stop 2)
+// One fixed line, chosen by the server. The page only asks "speak" and plays the audio that comes back.
+const speakEls = { button: $("speak"), status: $("speakStatus"), line: $("speakLine"), result: $("speakResult"),
+                   problem: $("speakProblem") };
+let speakWs = null, speakCtx = null, speakPlayer = null, speaking = false;
+
+// Plays raw 16-bit mono audio as it arrives: each piece is scheduled right after the previous one.
+function makePlayer(ctx, rate, onDone) {
+  const lead = 0.12;                         // a small head start so the first piece is not cut off
+  let next = 0, carry = null, open = 0, ended = false, underruns = 0, finished = false;
+  function check() {
+    if (ended && open === 0 && !finished) { finished = true; onDone({ underruns }); }
+  }
+  function push(buffer) {
+    let bytes = new Uint8Array(buffer);
+    if (carry !== null) {                    // a piece can end mid-sample: keep the odd byte for the next piece
+      const merged = new Uint8Array(carry.length + bytes.length);
+      merged.set(carry); merged.set(bytes, carry.length);
+      bytes = merged; carry = null;
+    }
+    if (bytes.length % 2) { carry = bytes.slice(bytes.length - 1); bytes = bytes.slice(0, bytes.length - 1); }
+    if (!bytes.length) return;
+    const count = bytes.length / 2, view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+    const audio = ctx.createBuffer(1, count, rate), samples = audio.getChannelData(0);
+    for (let i = 0; i < count; i++) samples[i] = view.getInt16(i * 2, true) / 32768;
+    const source = ctx.createBufferSource();
+    source.buffer = audio;
+    source.connect(ctx.destination);
+    const now = ctx.currentTime;
+    if (next === 0) next = now + lead;
+    else if (next < now) { underruns++; next = now + 0.03; }       // the audio arrived late: there will be a gap
+    source.start(next);
+    next += audio.duration;
+    open++;
+    source.onended = () => { open--; check(); };
+  }
+  return { push, end() { ended = true; check(); } };
+}
+
+function speakMessage(msg) {
+  if (msg.type === "speech_start") {
+    speakEls.line.textContent = msg.text;
+    speakEls.status.textContent = "Speaking...";
+    speakPlayer = makePlayer(speakCtx, msg.sample_rate, (info) => {
+      speaking = false;
+      speakEls.button.disabled = false;
+      speakEls.status.textContent = "Finished." + (info.underruns ? " (There were " + info.underruns + " gap(s): audio arrived late.)" : "");
+    });
+  } else if (msg.type === "speech_end") {
+    speakEls.result.textContent = (msg.cached ? "From memory (cached): free, instant. " : "Asked the speech service: " +
+      (msg.first_byte_s === null ? "" : "first audio after " + msg.first_byte_s + " s, ") + msg.attempts + " attempt(s). ") +
+      msg.chars + " characters, about " + msg.credits.toFixed(3) + " credits (estimate). Audio length " + msg.audio_s + " s.";
+    showCredits(0, msg.ledger_spent, parseFloat(els.pool.textContent) || 5000, msg.ledger_spent / (parseFloat(els.pool.textContent) || 5000), false);
+    if (speakPlayer) speakPlayer.end();
+  } else if (msg.type === "speech_error") {
+    speakEls.problem.textContent = msg.message;
+    speakEls.status.textContent = "Not spoken.";
+    speaking = false;
+    speakEls.button.disabled = false;
+  }
+}
+
+function openSpeakSocket() {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket("ws://" + location.host + "/ws/speak");
+    socket.binaryType = "arraybuffer";
+    socket.onopen = () => resolve(socket);
+    socket.onerror = () => reject(new Error("Could not talk to the local server. Is it still running?"));
+    socket.onmessage = (event) => {
+      if (typeof event.data === "string") speakMessage(JSON.parse(event.data));
+      else if (speakPlayer) speakPlayer.push(event.data);
+    };
+    socket.onclose = () => { speakWs = null; };
+  });
+}
+
+async function speakTestLine() {
+  if (speaking) return;
+  speakEls.problem.textContent = "";
+  speakEls.result.textContent = "";
+  speaking = true;
+  speakEls.button.disabled = true;
+  speakEls.status.textContent = "Asking...";
+  try {
+    if (!speakCtx) speakCtx = new AudioContext();            // created inside the click so the browser allows sound
+    await speakCtx.resume();
+    if (!speakWs || speakWs.readyState !== WebSocket.OPEN) speakWs = await openSpeakSocket();
+    speakWs.send(JSON.stringify({ type: "speak" }));
+  } catch (err) {
+    speakEls.problem.textContent = err.message || "The test line could not be started.";
+    speakEls.status.textContent = "Not spoken.";
+    speaking = false;
+    speakEls.button.disabled = false;
+  }
+}
+speakEls.button.addEventListener("click", speakTestLine);
 
 els.start.addEventListener("click", startCall);
 els.hangup.addEventListener("click", hangUp);

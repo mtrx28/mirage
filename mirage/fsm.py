@@ -305,6 +305,8 @@ class ReplyPlan:
     gate_action: str | None = None  # set by the safety gate: replaced, deflect, disclose, hostile_calm, hostile_goodbye ...
     end_call: bool = False          # the call is over after this reply
     gate_notes: tuple[str, ...] = ()  # why the gate acted (violations found, which rule fired)
+    gated: bool = False             # True on every plan the safety gate returned (even one it passed unchanged); the
+                                    # speaking path refuses a plan without it. It guards against FORGETTING the gate, not forgery.
 
 
 @dataclass(frozen=True)

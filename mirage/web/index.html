@@ -46,7 +46,7 @@
 <main>
   <div>
     <section>
-      <h1>Rajesh Uncle (stop 1: listening only)</h1>
+      <h1>Rajesh Uncle (stops 1 and 2: listening, and a voice test)</h1>
       <p class="muted">Press Start, allow the microphone, and speak as the caller. Uncle does not answer yet:
         this stage only shows what the speech service heard. Wear headphones and talk into the laptop microphone.</p>
       <div class="controls">
@@ -55,6 +55,18 @@
         <span id="status">Not connected.</span>
       </div>
       <div id="problem" role="alert"></div>
+    </section>
+    <section style="margin-top:16px">
+      <h2>Voice test (stop 2)</h2>
+      <p class="muted">Plays one fixed line in Uncle's voice. The server picks the line, not this page. The first press asks
+        the speech service (it costs a little); pressing again plays it from memory (free). Not available during a call.</p>
+      <div class="controls">
+        <button id="speak">Speak the test line</button>
+        <span id="speakStatus" class="muted"></span>
+      </div>
+      <p id="speakLine" style="font-style:italic"></p>
+      <div id="speakResult" class="muted"></div>
+      <div id="speakProblem" role="alert" class="warn"></div>
     </section>
     <section style="margin-top:16px">
       <h2>Live transcript</h2>

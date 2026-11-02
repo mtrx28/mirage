@@ -324,7 +324,7 @@ class Gate:
         if state.ended:   # the call is over (a goodbye or a disclosure was already spoken): nothing more is said
             over = replace(plan, text="", digit_sources=(), tactic="gate_call_over", source="gate", line_id=None,
                            needs_gate=False, gate_action="call_over", end_call=True, expected=None,
-                           awaiting_digits=False, gate_notes=("the call already ended",))
+                           awaiting_digits=False, gate_notes=("the call already ended",), gated=True)
             state.gate_log.append({"turn": ctx.turn, "action": "call_over", "why": "the call already ended",
                                    "tactic": over.tactic})
             return over
@@ -337,7 +337,7 @@ class Gate:
                 fallback = replace(fallback, text="", digit_sources=(), end_call=True, gate_action="fail_closed")
             chosen, action, why = fallback, fallback.gate_action or "replaced", "; ".join(violations)
         state.gate_log.append({"turn": ctx.turn, "action": action, "why": why, "tactic": chosen.tactic})
-        return chosen
+        return replace(chosen, gated=True)
 
     # -- deciding what to say
 

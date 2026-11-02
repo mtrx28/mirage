@@ -110,7 +110,7 @@ class VoiceConfig:
     vad_threshold: float = 0.7
     min_speech_ms: int = 200
     idle_timeout_s: int = 300              # docs: default 60, range 5 to 900
-    use_keyterms: bool = True
+    use_keyterms: bool = False             # no evidence yet that they help (one sample each); see the log
     connect_timeout_s: float = 15.0
     max_reconnects: int = 1                # docs say nothing about reconnecting; one try, no audio replay (a guess)
     reconnect_delay_s: float = 1.0
@@ -136,6 +136,24 @@ class VoiceConfig:
     seed_requests: int = 23
     ledger_path: Path = DATA_DIR / "credits.json"
     flush_every_s: float = 15.0            # the ledger is written this often during a call
+
+    # Timbre (text to speech). Voice, language and rate were chosen by listening; the limits are GUESSES.
+    timbre_url: str = "https://api.vachana.ai/api/v1/tts/sse"
+    timbre_model: str = "timbre-v3.0"
+    tts_voice: str = "Prakash"
+    tts_language: str = "hi-en"            # Latin-script Hinglish
+    tts_sample_rate: int = 24000           # 24 kHz mono 16-bit for the browser; a phone-quality 8 kHz is a later decision
+    tts_speed: float = 1.0
+    tts_attempt_timeout_s: float = 6.0     # one request (a short line takes about a second)
+    tts_deadline_s: float = 10.0           # all attempts for one line; a late line is nearly worthless
+    tts_retry_waits_s: tuple[float, ...] = (0.5, 1.0)    # waits before retry 1 and retry 2, after a 429 or a 5xx
+    tts_max_chars: int = 400               # one line, tags included; a stuck loop cannot spend more per line
+    tts_cache_max_lines: int = 64
+    tts_cache_max_bytes: int = 20_000_000
+    tts_first_429_path: Path = DATA_DIR / "timbre_first_429.txt"
+    tts_log_path: Path = DATA_DIR / "tts_log.jsonl"     # one line per spoken line: timing, characters, credits (for E2 later)
+    speak_test_seed: int = 0               # the fixed test line is the brain's first reply to "Hello?" with this seed
+    speak_test_caller_line: str = "Hello?"
 
     # evidence and data. Raw audio is OFF unless MIRAGE_SAVE_AUDIO=1 is set.
     calls_dir: Path = DATA_DIR / "calls"

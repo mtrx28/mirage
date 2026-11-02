@@ -18,16 +18,22 @@ import json
 import logging
 import os
 import sys
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from mirage.calllog import purge_old_audio
 from mirage.config import ROOT, VoiceConfig
 from mirage.credits import CreditLimitReached, Ledger
 from mirage.prisma import PrismaError, PrismaLink, load_keyterms
-from mirage.session import CallSession, GateRequired, require_gate
+from mirage.gaterequired import GateRequired, require_gate  # noqa: F401  (GateRequired is imported from here by the tests)
+from mirage.session import CallSession
+from mirage.timbre import SpeechQueue, Speaker, TimbreClient, TimbreError, UngatedPlan
+from mirage.voicetest import fixed_line_plan
 
 log = logging.getLogger("mirage.server")
 
@@ -91,12 +97,20 @@ def allowed_origins(cfg: VoiceConfig) -> set[str]:
 
 def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger | None = None,
                key_loader=load_key_from_env, keyterms: list[str] | None = None,
-               link_factory=PrismaLink, max_call_s: float | None = None) -> FastAPI:
+               link_factory=PrismaLink, max_call_s: float | None = None, tts_client_factory=TimbreClient) -> FastAPI:
     require_gate(gate)                                      # no gate, no server
     cfg = cfg or VoiceConfig()
     ledger = ledger or Ledger(cfg)
-    app = FastAPI(title="Mirage", docs_url=None, redoc_url=None, openapi_url=None)
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        yield
+        if app.state.tts_client is not None:
+            await app.state.tts_client.aclose()
+
+    app = FastAPI(title="Mirage", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.active = False
+    app.state.speaker = None            # built on first use, then kept so its in-memory audio cache survives between presses
+    app.state.tts_client = None
     app.state.ledger = ledger
     origins = allowed_origins(cfg)
 
@@ -177,6 +191,88 @@ def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger |
             if watcher is not None:
                 watcher.cancel()
             app.state.active = False
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
+    def get_speaker() -> Speaker | None:
+        if app.state.speaker is None:
+            key = key_loader()
+            if not key:
+                return None
+            app.state.tts_client = tts_client_factory(cfg, key)
+            app.state.speaker = Speaker(gate, SpeechQueue(app.state.tts_client, cfg, ledger))
+        return app.state.speaker
+
+    def log_speech(record: dict) -> None:
+        try:
+            cfg.tts_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with cfg.tts_log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **record},
+                                   ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
+    async def speak_fixed_line(ws: WebSocket) -> None:
+        speaker = get_speaker()
+        if speaker is None:
+            await ws.send_json({"type": "speech_error", "message": "GNANI_API_KEY is missing. Put it in the .env file "
+                                "(see .env.example) and restart the server."})
+            return
+        plan = fixed_line_plan(gate, cfg)               # the browser never supplies the text
+        spent_before = ledger.spent
+        try:
+            await ws.send_json({"type": "speech_start", "text": plan.text, "sample_rate": cfg.tts_sample_rate,
+                                "chars": len(plan.text)})
+
+            async def forward(piece: bytes) -> None:
+                await ws.send_bytes(piece)
+
+            result = await speaker.say(plan, forward)
+        except (TimbreError, UngatedPlan, CreditLimitReached) as e:
+            log_speech({"ok": False, "error": str(e), "chars": len(plan.text)})
+            await ws.send_json({"type": "speech_error", "message": str(e)})
+            return
+        credits = round(ledger.spent - spent_before, 4)
+        log_speech({"ok": True, "chars": result.chars, "cached": result.cached, "first_byte_s": result.first_byte_s,
+                    "total_s": round(result.total_s, 3), "attempts": result.attempts, "audio_s": round(result.seconds, 2),
+                    "credits_estimate": credits})
+        await ws.send_json({"type": "speech_end", "cached": result.cached, "chars": result.chars, "credits": credits,
+                            "first_byte_s": None if result.first_byte_s is None else round(result.first_byte_s, 2),
+                            "total_s": round(result.total_s, 2), "audio_s": round(result.seconds, 2),
+                            "attempts": result.attempts, "ledger_spent": round(ledger.spent, 2)})
+
+    @app.websocket("/ws/speak")
+    async def speak(ws: WebSocket) -> None:
+        if ws.headers.get("origin") not in origins:
+            await ws.close(code=1008)
+            return
+        await ws.accept()
+        try:
+            while True:
+                try:
+                    message = await ws.receive()
+                except RuntimeError:
+                    break
+                if message["type"] == "websocket.disconnect":
+                    break
+                try:
+                    data = json.loads(message.get("text") or "")
+                except ValueError:
+                    continue
+                if data.get("type") == "speak":
+                    if app.state.active:                                 # a call, or another test line, is running
+                        await ws.send_json({"type": "speech_error", "message": "A call or another test line is running. Wait or hang up first."})
+                        continue
+                    app.state.active = True                              # held only while this one line is spoken
+                    try:
+                        await speak_fixed_line(ws)
+                    except (RuntimeError, WebSocketDisconnect):          # the page went away mid-line
+                        break
+                    finally:
+                        app.state.active = False
+        finally:
             try:
                 await ws.close()
             except Exception:

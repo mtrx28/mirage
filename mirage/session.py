@@ -21,23 +21,13 @@ from mirage.audio import Framer, Pacer, Resampler
 from mirage.calllog import CallLog
 from mirage.config import VoiceConfig
 from mirage.credits import CallMeter, CreditLimitReached, Ledger
+from mirage.gaterequired import GateRequired, require_gate  # noqa: F401  (re-exported: tests and the server import them from here)
 from mirage.llm import scrub
 from mirage.prisma import PrismaError, PrismaLink
 
 log = logging.getLogger("mirage.session")
 
 Notify = Callable[[dict], Awaitable[None]]
-
-
-class GateRequired(RuntimeError):
-    """Raised when something tries to run the voice path without the safety gate."""
-
-
-def require_gate(gate: object) -> object:
-    if gate is None or not callable(gate):
-        raise GateRequired("The voice path will not start without the safety gate (mirage.safety.Gate). "
-                           "Nothing may be spoken to a caller that has not passed it.")
-    return gate
 
 
 class CallSession:

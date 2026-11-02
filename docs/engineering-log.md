@@ -541,6 +541,106 @@ is missing) and fails when the old behaviour is put back.
 **Logging added** so the next run can be checked without guessing: the names of the headers actually sent (never values)
 and the whole raw transcript message from Prisma are now in the evidence log.
 
+## Voice path, stop 1: the re-run with a proper microphone (2026-11-02)
+
+**Finding for the README: capture quality dominates everything downstream.** The first two runs used a headphone
+microphone and gave thin audio: Prisma's VAD reported no speech for long stretches (8.3 s mid-call in run 1, the first
+30.4 s of run 2), 6 of 19 segments came back empty, and a slowly read number was lost. With a proper microphone the same
+kind of script came through. The owner found the cause by swapping the microphone. We did not save audio from the thin
+runs, so the cause rests on that swap and cannot be examined further. **The friend session needs a good microphone;
+headphones are only for Uncle's voice.**
+
+Script (owner): "Namaste, main Rajesh bol raha hoon. Mujhe CBI se phone aaya tha. Unhone kaha KYC update karna hai. Phir
+mujhe AnyDesk download karne ko bola. Case number hai chaar saat do nau ek.", then "Phone number hai ... zero, zero, zero,
+zero, do, saat, chaar, ek, nau, chhe" with a pause after each digit. Two calls, keyterms off (`20261102_181732_41ec`) and on
+(`20261102_181944_fa72`).
+
+- **Result:** CBI, KYC, AnyDesk and the case number (4 7 2 9 1) came through in both calls. The phone number arrived in
+  pieces ("जीरो", "Zero", "zero zero दो सात चार एक नौ छह") that add up to 0000274196, and the owner then said the whole
+  number once more ("zero zero zero zero दो सात चार एक नौ छह"). **One sample per run, not a measured rate; E1 will measure
+  digit capture.**
+- **Keyterms: no evidence either way**, one sample each with nearly identical text. They stay OFF by default (the server's
+  default is now `off`); test them later on one saved clip replayed with and without.
+- **Fluent speech arrives late.** About 15 s of continuous reading came back as one transcript at 16.6 s (13.3 s of audio,
+  run 1) and 17.2 s (16.2 s of audio, run 2): Prisma waits for 500 ms of silence, so a long stretch is one late
+  transcript. A real scammer talks in long stretches. On the later list: a larger `x-max-speech-s` as a safety cap (about
+  20 to 30 s). Caveat: it cuts at a time limit, so it can split sentences and numbers (we saw this with 6 s).
+- **The ledger is an estimate that leans high.** The two runs moved it 0.234 and 0.237 credits (35 s calls), counting
+  Prisma's reported seconds including padding and empty segments. The dashboard figure for these runs is still to come; then
+  `python -m mirage.credits sync` and the log will say by how much it leans.
+
+### Offline replay of those two calls through the brain (no network, no audio)
+
+Transcript text and arrival times only, the real brain and gate, synthetic mode on, the 1.8 s digit-mode wait, a reply
+firing when the wait passes with nothing newer. Script: scratchpad `replay_calls.py`, not in the repo.
+
+- **The phone number does come out: `0000274196`** (valid, "keyword" confidence, 00-prefix synthetic), in both calls,
+  and the case number `47291`. **But only from the final repeat**, not from the pieces.
+- **The pieces were not joined.** The first transcript ended "...Phone number है जीरो" and "Zero" followed 1 s later
+  (joined correctly). The brain then answered at t = 19.4 s (call 1) / 20.0 s (call 2), while the caller was still
+  reading digits; the next piece ("zero zero दो सात चार एक नौ छह", 7.9 s of audio) only arrived at 26.1 s / 26.3 s. It was
+  extracted alone as an unlabelled `ambiguous 00274196` and stayed in the stored intel beside the phone number. The brain's
+  reply at 19.4 s ("Woh app download hi nahin ho raha...") talked over a caller who was mid-number.
+- **Cause:** a transcript arrives only after the utterance ends (500 ms of silence), so "no transcript for 1.8 s" does not
+  mean the caller stopped. The speech-time join in `extract_intel` is fine: the pieces start 0.6 s apart in speech time, and
+  fed together they give `phone 0000274196` (checked). The loss is in the turn-taking: the reply fired before the later
+  pieces arrived.
+- **What-if, not implemented:** holding the reply while Prisma has sent a `speech_start` with no transcript yet. In both
+  calls `speech_start` for the next piece arrived 0.11 s to 0.22 s after the previous transcript, well inside the 1.8 s
+  wait, so a hold would have caught it. With the hold, the whole call is one turn and the stored intel is clean (case and
+  phone once each). Two samples only.
+- **The repeat is not counted as a different number:** stored intel keeps one `phone` entry (entries are de-duplicated on
+  kind and value). Two loose ends: in the live-style replay the `ambiguous` fragment stays as its own entry; and when the
+  first full number and its repeat land in the same turn, that turn's `findings` list holds the number twice (same value).
+  Neither was changed. To decide for stop 3: hold the reply while an utterance is open (with a ceiling, so a stuck
+  utterance cannot block forever), de-duplicate findings within a turn, and drop an `ambiguous` fragment once a labelled
+  number contains it.
+
+## Voice path, stop 2 (text to Timbre to the speaker)
+
+Built and tested against an in-process mock of Timbre. **Nothing has run against the real service yet.** No audio was
+rendered, no line was pre-rendered, and no real 429 was provoked (the 429 behaviour is tested with a mock only).
+
+- **Docs re-read** (docs.gnani.ai/api/TTS/tts-sse.md): the request goes to `/api/v1/tts/sse` with the key in
+  `X-API-Key-ID`; the reply is Server-Sent Events (`start`, `chunk` with base64 audio, then `complete`, or `error`).
+  **One active request at a time:** a second gets HTTP 429 with `RATE_LIMITED` and the text "Only 1 active request is
+  allowed at a time". 403 means key, organisation or credits; 500 and 503 are temporary. **The page does not state**
+  a character limit per request, any retry or backoff advice, or anything about billing. So `tts_max_chars` (400),
+  the retry waits and the deadline are our guesses, and the 429 reading is only as good as that one documented example.
+  The docs also tell you to write numbers "as spoken words"; we keep the spaced numerals chosen by listening.
+- **Built:** `mirage/timbre.py` (client, cache, one-at-a-time queue, `Speaker`), `mirage/voicetest.py` (the fixed line),
+  `mirage/gaterequired.py` (the gate-required rule, now shared), the `/ws/speak` route, and the "Speak the test line"
+  button with a small player in the page. Settings are in `VoiceConfig` (guesses, except the voice, language and 24 kHz
+  rate, which were chosen by listening).
+- **429 and temporary errors:** a 429 or a 5xx before any audio is retried twice, after 0.5 s and then 1.0 s, inside a
+  10 s deadline; a `Retry-After` is honoured when it fits (a 30 s one gives up at once, since a line that late is
+  worthless). A 429 that reads as out of credits is not retried. A failure after audio has started is not retried
+  (that would speak the start of the line twice). When it gives up, the line is NOT spoken and the page says so.
+  **The wording that tells "busy" from "out of credits" is a guess** apart from the documented "active request"
+  sentence. The first 429 body ever seen is saved once, with the key blanked, in `data/timbre_first_429.txt`.
+- **One at a time, newest wins:** the queue runs one request; a newer line replaces one still waiting (its caller gets
+  nothing back); the line already being spoken is never cut off. Tested with a mock that records how many requests
+  ran at once (never more than 1).
+- **Cache:** in memory only, bounded (64 lines, 20 MB), least recently used out. The key includes text, voice, language,
+  speed and rate. A repeated line is served from memory in about 0.2 s pieces, costs nothing and sends no request.
+- **Billing in our ledger:** a line is counted (characters, tags included, at 2.7 per 1,000) when its first audio arrives;
+  a request that fails with no audio is not charged. Unknown: whether Gnani bills failed or partial requests the same way.
+- **The gate on the speaking path:** `Speaker` is built with the gate (no gate, no Speaker) and refuses any plan that
+  did not come back from the gate. To make that checkable, **every plan the gate returns is now stamped `gated=True`**,
+  including one it passes unchanged (before, a clean pass left no mark on the plan, only an entry in the gate log). The
+  stamp guards against forgetting the gate, not against forgery. The test button's line is the brain's first reply to
+  "Hello?" (a template line), run through the gate; **the browser never sends the text**, and a test sends a hostile
+  `text` field to prove it is ignored.
+- **Tests:** 36 new (529 in all). Nine deliberate breakages were each caught: skipping the `gated` check, skipping the cache,
+  no retry waits, removing "newest wins", skipping `require_gate` in the speaker, removing the origin check on the new route,
+  charging before audio arrives, not stamping gate output, and not counting a gap in the page's player. One of them
+  (removing "newest wins") first made a test hang instead of fail; the test now has a 5 s limit.
+- **Not built (stop 3 and later):** the brain loop, half-duplex muting, pausing replies while a caller's utterance is open,
+  playback-finished reporting back to the server, the dashboard's stage and intel panels, latency percentiles.
+- **Unknown until the first real run:** time to first audio, whether `<coughs>` style tags in the text come through as
+  intended on the 24 kHz raw stream, whether the service sends a WAV header despite `raw` (handled if it does), whether the
+  browser plays chunks without audible gaps, and what Timbre really charges for the 49-character test line.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
@@ -550,7 +650,7 @@ and the whole raw transcript message from Prisma are now in the evidence log.
   transcript, via a Finding's quote), not only on patterns, because Uncle must be able to read back the caller's digits.
   `looks_like_real_mobile` is only a pattern check on whole digit runs.
 - Client-side end-of-speech detector with `commit` as an optimisation, with its own evaluation.
-- A larger `x-max-speech-s` (about 20 to 30 s) as a safety cap only.
+- A larger `x-max-speech-s` (about 20 to 30 s) as a safety cap only. It cuts at a time limit, so it can split sentences and numbers.
 - Amounts in words ("पचास हज़ार") are not parsed.
 
 ## Decisions
