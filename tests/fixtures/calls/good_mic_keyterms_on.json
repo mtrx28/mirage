@@ -1,0 +1,47 @@
+{
+ "speech_starts": [
+  {
+   "utterance_id": "ud44d134e",
+   "t": 0.734
+  },
+  {
+   "utterance_id": "ub37ae88d",
+   "t": 17.187
+  },
+  {
+   "utterance_id": "ua6eea997",
+   "t": 18.281
+  },
+  {
+   "utterance_id": "u292e3b40",
+   "t": 26.281
+  }
+ ],
+ "transcripts": [
+  {
+   "utterance_id": "ud44d134e",
+   "t": 17.187,
+   "text": "नमस्ते, मैं राजेश बोल रहा हूँ। मुझे CBI से phone आया था। उन्होंने कहा KYC update करना है, फिर मुझे AnyDesk download करने को बोला। Case number है चार सात दो नौ एक, phone number है जीरो।",
+   "audio_s": 16.16
+  },
+  {
+   "utterance_id": "ub37ae88d",
+   "t": 18.171,
+   "text": "zero",
+   "audio_s": 1.44
+  },
+  {
+   "utterance_id": "ua6eea997",
+   "t": 26.281,
+   "text": "zero zero दो सात चार एक नौ छह।",
+   "audio_s": 7.904
+  },
+  {
+   "utterance_id": "u292e3b40",
+   "t": 32.328,
+   "text": "Phone number hai zero zero zero zero दो सात चार एक नौ छह।",
+   "audio_s": 6.048
+  }
+ ],
+ "_note": "Transcript text, arrival times and utterance ids only, from the owner's staged script (synthetic data). No audio, no key, no request ids."
+}

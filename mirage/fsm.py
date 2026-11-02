@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Callable
 
 from mirage.config import ROOT, FSMConfig
-from mirage.extract import Finding, Transcript, ends_with_digits, extract_intel, norm_word
+from mirage.extract import (DIGIT_KINDS_TIDY, Finding, Transcript, ends_with_digits, extract_intel, norm_word,
+                            redundant_fragment)
 from mirage.lines import Line, LineBank, SlotOption, load_lines, text_problems
 from mirage.persona import Persona, load_persona
 from mirage.spoken import render_fact, speak_code, speak_digits
@@ -454,10 +455,20 @@ class CallBrain:
     # ------------------------------------------------------------------ pieces of a turn
 
     def _record_intel(self, findings: tuple[Finding, ...]) -> None:
+        intel = self.state.intel
         for f in findings:
-            bucket = self.state.intel.setdefault(f.kind, [])
+            if f.kind == "ambiguous" and redundant_fragment(
+                    f.value, [(g.kind, g.value) for k in DIGIT_KINDS_TIDY for g in intel.get(k, [])]):
+                continue                                   # a piece of a number we already hold
+            bucket = intel.setdefault(f.kind, [])
             if all(f.value != g.value for g in bucket):
                 bucket.append(f)
+            if f.kind in DIGIT_KINDS_TIDY and "ambiguous" in intel:
+                # a number that contains an earlier unlabelled fragment replaces it
+                intel["ambiguous"] = [g for g in intel["ambiguous"]
+                                      if g is f or not redundant_fragment(g.value, [(f.kind, f.value)])]
+                if not intel["ambiguous"]:
+                    del intel["ambiguous"]
 
     def _update_flags(self, signals: Signals, findings: tuple[Finding, ...]) -> None:
         st = self.state

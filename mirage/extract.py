@@ -530,6 +530,34 @@ def ends_with_digits(text: str) -> bool:
     return bool(toks) and toks[-1].kind in ("digit", "numeral")
 
 
+# --------------------------------------------------------------------------- tidying what was found
+
+DIGIT_KINDS_TIDY = ("phone", "account", "case", "ambiguous")
+
+
+def redundant_fragment(value: str, others: Sequence[tuple[str, str]]) -> bool:
+    """Is an unlabelled digit run `value` just a piece of a number heard whole elsewhere? `others` are (kind, value) pairs of
+    the OTHER findings. True if a strictly longer number contains it, or a labelled (non-"ambiguous") number equals it."""
+    return bool(value) and any((len(v) > len(value) and value in v) or (v == value and k != "ambiguous") for k, v in others)
+
+
+def tidy_findings(findings: Sequence[Finding]) -> list[Finding]:
+    """Two clean-ups, applied to every list extract_intel returns:
+    1. the same kind and value found twice (a number said again within one turn) is kept once, at its first mention;
+    2. an unlabelled digit run ("ambiguous") that is just a piece of a longer number found in the same list is dropped.
+    A DIFFERENT number is never merged: only an identical value, or a strict piece of a longer one."""
+    seen: set[tuple[str, str]] = set()
+    unique: list[Finding] = []
+    for f in findings:
+        if (f.kind, f.value) in seen:
+            continue
+        seen.add((f.kind, f.value))
+        unique.append(f)
+    return [f for f in unique
+            if not (f.kind == "ambiguous"
+                    and redundant_fragment(f.value, [(g.kind, g.value) for g in unique if g is not f and g.kind in DIGIT_KINDS_TIDY]))]
+
+
 # --------------------------------------------------------------------------- the top-level call
 
 def extract_intel(
@@ -598,4 +626,4 @@ def extract_intel(
         found.append((run.first, f))
 
     found.sort(key=lambda pair: pair[0])   # the order they were said
-    return [f for _, f in found]
+    return tidy_findings([f for _, f in found])

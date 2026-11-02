@@ -54,6 +54,9 @@ class FSMConfig:
     normal_wait_s: float = 0.0       # extra wait after the last transcript before Uncle replies (Prisma already waited ~0.5 s)
     digit_wait_s: float = 1.8        # in digit-dictation mode: wait longer, the caller may be mid-number
     join_window_s: float = 2.5       # transcripts this close together are one dictation (see extract.py)
+    hold_ceiling_s: float = 10.0     # GUESS: a reply is held while Prisma has an utterance open (speech_start, no transcript yet);
+                                     # an utterance still open after this long is treated as stuck and stops blocking replies.
+                                     # Real utterances in the two good calls stayed open up to 13.5 s, so this can fire on genuine speech.
     recent_line_memory: int = 5      # a line is not repeated if it is among the last N lines said
     max_alarm_uses: int = 2
     max_stall_uses: int = 2

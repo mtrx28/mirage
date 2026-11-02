@@ -641,6 +641,51 @@ rendered, no line was pre-rendered, and no real 429 was provoked (the 429 behavi
   intended on the 24 kHz raw stream, whether the service sends a WAV header despite `raw` (handled if it does), whether the
   browser plays chunks without audible gaps, and what Timbre really charges for the 49-character test line.
 
+## Turn-taking: the hold rule, and tidying repeated numbers (offline, no network)
+
+Built after the replay of the two good-microphone calls showed Uncle answering mid-number. All offline.
+
+- **The hold rule** (`mirage/turns.py`, `TurnScheduler`). A reply is held while Prisma has an utterance open (a
+  `speech_start` with no transcript yet). Any transcript for that utterance closes it, **empty ones too**, so noise blips
+  cannot freeze Uncle (6 of 19 segments were empty in the thin-mic run). An utterance still open after
+  `FSMConfig.hold_ceiling_s` (**10 s, a guess**) is treated as stuck and stops blocking. Otherwise the reply is due when the
+  brain's own wait (0 s normally, 1.8 s in digit mode) has passed since the newest transcript. It has no clock and no
+  network: the time is passed in, so it can be tested and replayed.
+- **What Uncle does when the ceiling fires:** he answers what has been heard so far, as if no utterance were open
+  (a `hold_ceiling` entry is logged). If that utterance's transcript turns up later it is logged as a late transcript and heard
+  as a new turn. The ceiling is not a recovery for a lost utterance, only a way never to be silent forever.
+- **Tidying:** the same kind and value found twice in one turn is kept once (at its first mention), and an unlabelled digit run
+  ("ambiguous") that is a piece of, or equal to, a longer or labelled number is dropped, both within a turn (`extract_intel`)
+  and in the stored intel across turns (`CallBrain._record_intel`). A different number is never merged. One identical
+  value under two different kinds (phone and account) is two findings.
+- **Replay tool:** `python -m mirage.replay <call folder or fixture> [--normal-wait S] [--ceiling S] [--drop-last N]`.
+  The two good calls are saved as fixtures in `tests/fixtures/calls/` (transcript text, arrival times and utterance ids
+  only, from the owner's staged script; no audio, no key, no request ids).
+
+**Replay results (the real calls, keyterms off / on):**
+
+| | Before | After |
+|---|---|---|
+| Uncle's replies in the call | 3 turns; the 2nd at 19.4 s, mid-number | 2 turns (3.05 s greeting, then 33.6 s after the whole dictation), none during the number |
+| Phone number | only from the final repeat; the pieces left an unlabelled `ambiguous 00274196` | `0000274196`, keyword confidence, built from "जीरो \| Zero \| zero zero दो सात चार एक नौ छह" |
+| Findings in the turn | the number twice | once |
+| Stored intel | case, phone, and a stray fragment | case `47291` and phone `0000274196` |
+| **Without the final repeat** (`--drop-last 1`) | the number never labelled | `0000274196`, labelled `phone`, both calls |
+
+A test switches the hold off (ceiling 0) and shows the old failure coming back, so the replay tests can fail.
+
+**Trade-offs found by the replay (not fixed; for decision):**
+
+1. **The ceiling can fire on genuine speech.** In the recorded call one real utterance stayed open for 13.5 s (the opening
+   monologue). A 10 s ceiling releases it mid-speech (Uncle says "Haan ji boliye" at 13.05 s while the caller is still talking);
+   15 s does not. Longer ceilings mean longer worst-case silence for a truly stuck utterance.
+2. **A chain of utterances is never "stuck".** With a 15 s ceiling the whole 30 s monologue was answered once, at 33.6 s,
+   because each utterance started right after the previous transcript. There is no cap on the total hold.
+3. **With the normal wait at 0 s the hold cannot see the next utterance.** The greeting went out at 3.05 s, in the same
+   millisecond that the next `speech_start` arrived (in 4 of 4 samples the next start came 0 to 0.2 s after the previous
+   transcript). A normal wait of 0.3 s catches it, at the cost of 0.3 s on every turn. Not changed.
+4. Only two calls, one speaker, one microphone; the numbers are what happened, not rates.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
