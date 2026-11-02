@@ -1,0 +1,12 @@
+# Stage-detection cases written by the FRIEND who plays the scammer: "set 3 (friend, held out)".
+#
+# Nothing has been written here yet. Do not read this file, and do not change any rule in response to it, until the
+# project owner says so. The test report prints only counts for this set (no missed lines) until then.
+#
+# Format, one case per line:   STAGE | what the scammer says
+# STAGE is S0, S1, S2, S3, S4 or S5:
+#   S0 the hook (parcel, courier, KYC, "I am calling from ...")     S1 fear and authority (police, CBI, arrest, case, warrant)
+#   S2 the caller waits impatiently (hold on, are you there)        S3 payment instructions (UPI, account, IFSC, "send money")
+#   S4 pressure for speed (hurry, install the app, send the OTP)    S5 giving up or hanging up
+# Lines starting with # are ignored. Hinglish in Latin or Devanagari script, as Prisma would write it.
+# Please write only about the scam types Mirage covers: digital arrest, fake agencies, courier and customs, bank KYC.

@@ -27,6 +27,14 @@ from mirage.fsm import STAGES, line_stage, load_rules, raw_stage
 RULES = load_rules()
 OWNER_FILE = ROOT / "tests" / "fixtures" / "stage_cases_user.txt"
 HELDOUT_FILE = ROOT / "tests" / "fixtures" / "stage_cases_heldout.txt"
+FRIEND_FILE = ROOT / "tests" / "fixtures" / "stage_cases_heldout_friend.txt"
+# Set 2 lines about scams Mirage does not implement, matched by the start of the line (lower case). They are
+# reported separately and left out of the in-scope score. See docs/safety.md.
+OUT_OF_SCOPE_SET2 = (
+    "hello ji electricity office se bol", "aaj raat bijli kat jayegi agar dues", "light chalu rakhni hai toh is number",
+    "sir trai complaint ke baare mein", "aapka number band hone wala hai trai", "aapke cousin ka phone aaya tha",
+    "tumhare relative ko chhudana hai",
+)
 
 # (expected stage or None, line). None means "below the minimum score: no stage is claimed".
 INVENTED = [
@@ -91,8 +99,11 @@ def parse_owner_file(path: Path | None = None) -> list[tuple[int, str, str]]:
     return cases
 
 
-def write_report(request, title: str, note: str, rows: list[tuple[str, str, str | None, str | None, float]]) -> None:
-    """rows: (text, wanted stage, stage claimed, weakest stage with any score, that score)."""
+def write_report(request, title: str, note: str, rows: list[tuple[str, str, str | None, str | None, float]],
+                 out_of_scope=None, show_misses: bool = True) -> None:
+    """rows: (text, wanted stage, stage claimed, weakest stage with any score, that score).
+    out_of_scope: optional function text -> bool; those lines are reported separately and left out of the in-scope score.
+    show_misses=False prints counts only (used for a set nobody is allowed to read yet)."""
     reporter = request.config.pluginmanager.get_plugin("terminalreporter")
     if reporter is None:
         return
@@ -100,12 +111,25 @@ def write_report(request, title: str, note: str, rows: list[tuple[str, str, str 
     weak_right = sum(1 for _, want, got, weak, _ in rows if got is None and weak == want)
     reporter.write_line("")
     reporter.write_line(f"== {title}: {right} of {len(rows)} lines matched ({note}) ==")
+    if out_of_scope:
+        inside = [r for r in rows if not out_of_scope(r[0])]
+        outside = [r for r in rows if out_of_scope(r[0])]
+        in_right = sum(1 for _, want, got, _, _ in inside if want == got)
+        out_right = sum(1 for _, want, got, _, _ in outside if want == got)
+        reporter.write_line(f"   in scope (digital arrest, fake agency, courier and customs, bank KYC): "
+                            f"{in_right} of {len(inside)}")
+        reporter.write_line(f"   out of scope (electricity, TRAI / SIM block, relative in trouble; not implemented): "
+                            f"{out_right} of {len(outside)}")
     reporter.write_line(f"   {weak_right} more had the right stage as their best guess but scored below the minimum.")
     reporter.write_line("   Not an accuracy figure: a small set, one line at a time.")
+    if not show_misses:
+        reporter.write_line("   (misses are not printed for this set until the owner says so)")
+        return
     for text, want, got, weak, weak_score in rows:
         if want != got:
             detail = f"got {got}" if got else f"got nothing (best guess {weak} at {weak_score:g})" if weak else "got nothing (no keyword)"
-            reporter.write_line(f"   miss: wanted {want}, {detail}: {text[:70]}")
+            tag = " [out of scope]" if out_of_scope and out_of_scope(text) else ""
+            reporter.write_line(f"   miss: wanted {want}, {detail}{tag}: {text[:70]}")
 
 
 def rows_for(cases: list[tuple[str | None, str]]) -> list[tuple[str, str | None, str | None, str | None, float]]:
@@ -153,13 +177,20 @@ def test_a_case_number_in_the_line_counts_as_evidence_for_s1():
 def test_owner_set_files_are_well_formed():
     parse_owner_file(OWNER_FILE)
     parse_owner_file(HELDOUT_FILE)
+    parse_owner_file(FRIEND_FILE)
 
 
-@pytest.mark.parametrize("path, title", [
-    (OWNER_FILE, "OWNER set 1 (dev set, tuned, not a test; untouched score was 11 of 27, see the log)"),
-    (HELDOUT_FILE, "OWNER set 2 (held out: the honest test)"),
+def out_of_scope_set2(text: str) -> bool:
+    return text.lower().startswith(OUT_OF_SCOPE_SET2)
+
+
+@pytest.mark.parametrize("path, title, kwargs", [
+    (OWNER_FILE, "OWNER set 1 (dev set, tuned, not a test; untouched score was 11 of 27, see the log)", {}),
+    (HELDOUT_FILE, "OWNER set 2 (dev set after the fix; untouched score was 4 of 18)",
+     {"out_of_scope": out_of_scope_set2}),
+    (FRIEND_FILE, "set 3 (friend, held out)", {"show_misses": False}),
 ])
-def test_owner_set_report(request, path, title):
+def test_owner_set_report(request, path, title, kwargs):
     cases = parse_owner_file(path)
     reporter = request.config.pluginmanager.get_plugin("terminalreporter")
     if not cases:
@@ -167,8 +198,13 @@ def test_owner_set_report(request, path, title):
             reporter.write_line("")
             reporter.write_line(f"== {title}: 0 lines yet; {path.name} has no cases ==")
         return
-    write_report(request, title, "closer to a real caller", rows_for([(stage, text) for _, stage, text in cases]))
+    write_report(request, title, "closer to a real caller", rows_for([(stage, text) for _, stage, text in cases]), **kwargs)
     # reported, not asserted: a low score here is information, not a failed build
+
+
+def test_the_out_of_scope_lines_of_set_2_are_the_seven_described_in_the_log():
+    texts = [text for _, _, text in parse_owner_file(HELDOUT_FILE)]
+    assert sum(out_of_scope_set2(t) for t in texts) == len(OUT_OF_SCOPE_SET2) == 7
 
 
 def test_owner_set_parser_reads_cases_and_rejects_bad_lines(tmp_path):
@@ -184,15 +220,25 @@ def test_owner_set_parser_reads_cases_and_rejects_bad_lines(tmp_path):
 # ---------------------------------------------------------------- freezing set 1, and one scoring function
 
 SET1_SHA256 = "dc25134c78e612c75d9dc2b0653973c0baf01db3f86f032f106aa19b9614c789"
+SET2_SHA256 = "6c39d80d389d14286e9f4b781eb5da09381aafeb7135ca80cae7bd9b65bab3d9"
+
+
+def _cases_digest(path: Path) -> str:
+    cases = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.strip().startswith("#")]
+    return hashlib.sha256(chr(10).join(cases).encode("utf-8")).hexdigest()
 
 
 def test_owner_set_1_is_frozen_after_tuning():
-    cases = [line.strip() for line in OWNER_FILE.read_text(encoding="utf-8").splitlines()
-             if line.strip() and not line.strip().startswith("#")]
-    digest = hashlib.sha256(chr(10).join(cases).encode("utf-8")).hexdigest()
-    assert digest == SET1_SHA256, (
+    assert _cases_digest(OWNER_FILE) == SET1_SHA256, (
         "stage_cases_user.txt (owner set 1) was tuned against and is frozen as a dev set. If you want new cases, "
         "write a new file; do not edit this one.")
+
+
+def test_owner_set_2_is_frozen_after_the_fix():
+    assert _cases_digest(HELDOUT_FILE) == SET2_SHA256, (
+        "stage_cases_heldout.txt (owner set 2) was read and the rules were changed afterwards, so it is a frozen dev "
+        "set now. Write new cases in a new file (the friend's set 3 is stage_cases_heldout_friend.txt).")
 
 
 def test_the_brain_and_the_stage_test_use_the_same_scoring_function(monkeypatch):
@@ -224,3 +270,53 @@ def test_a_fresh_brain_and_the_stage_helper_give_identical_scores_on_every_test_
         brain.state.turn = 1                                  # skip the opening greeting, which ignores the line
         brain.hear(text, 1.0, 2.0)
         assert brain.respond().stage.scores == line_scores(RULES, text), text
+
+
+# ---------------------------------------------------------------- verb stems: a short explicit list
+
+EXPECTED_STEMS = {"S2": ["ruk", "रुक"], "S3": ["bhej", "भेज", "jama", "जमा", "daal"], "S4": ["khol", "खोल"]}
+
+
+def test_the_stem_list_is_the_short_explicit_one():
+    assert {stage: [label for label, _, _ in items] for stage, items in RULES.stems.items()} == EXPECTED_STEMS
+
+
+@pytest.mark.parametrize("word", ["bhejiye", "bhejo", "bhejna", "bhejni", "bhejne", "bhejiyega", "भेजिए", "भेजो"])
+def test_every_politeness_form_of_a_stem_counts(word):
+    from mirage.fsm import score_text
+    scores, hits = score_text(RULES, f"paise {word}")
+    assert any(h.startswith(("bhej*", "भेज*")) for h in hits["S3"]), hits
+
+
+@pytest.mark.parametrize("stem", ["kar", "bol", "de", "bata", "ab", "रह"])
+def test_stems_of_very_common_or_very_short_verbs_are_refused(tmp_path, stem):
+    import json
+    from mirage.config import ROOT as repo_root
+    from mirage.fsm import RULES_PATH, load_rules
+    data = json.loads(RULES_PATH.read_text(encoding="utf-8"))
+    data["stems"]["S3"][stem] = 1.0
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_rules(path)
+
+
+def test_one_stem_alone_can_never_claim_a_stage():
+    assert all(weight < RULES.min_score for items in RULES.stems.values() for _, _, weight in items)
+    for line in ["bhejiye", "jama karo", "ruko", "app kholo", "daal do"]:
+        assert line_stage(RULES, line)[0] is None, line
+
+
+def test_stems_do_not_fire_on_ordinary_hinglish():
+    from mirage.fsm import score_text
+    ordinary = ["Kai baar bataya hai aapko", "Chai peeni hai kya", "Maine kaha tha", "mera naam Amit hai", "Bhai sahab kaise hain",
+                "Aaj ka din kaisa hai", "मैं बैंक से बोल रहा हूँ", "आपका खाता बंद है", "कई बार बताया है"]
+    for line in ordinary:
+        _, hits = score_text(RULES, line)
+        assert not any("*" in h for stage_hits in hits.values() for h in stage_hits), line
+
+
+def test_a_known_collision_is_harmless_daal_means_lentils():
+    from mirage.fsm import score_text
+    scores, _ = score_text(RULES, "aaj daal chawal bana hai")
+    assert scores["S3"] == 1.0 and line_stage(RULES, "aaj daal chawal bana hai")[0] is None

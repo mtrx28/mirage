@@ -270,6 +270,70 @@ stage test ignored the extractor's findings that the brain uses; the signal for 
   spaced numerals, plain numerals, Devanagari digit words), 242 characters, about 0.65 credits. After listening, the
   owner decides `FSMConfig.digit_style`.
 
+### First held-out measurement of the stage rules (2 Nov 2026): OWNER set 2, 4 of 18
+
+The owner wrote 18 lines after the keywords were tuned, without looking at the rules. Scored one line at a time: **4 of 18
+matched (22%)**. Of the 14 others, **12 claimed no stage** (the call stays where it is and Uncle stalls) and **2 claimed a
+wrong stage** (both "customs ... parcel" lines scored S0 although they were fear or payment). So the rules mostly stay
+quiet rather than err, but they are weak on lines they have not seen. This is the honest "closer to a real caller" number;
+it is not an accuracy figure (18 lines, one writer, no call history).
+
+- By label: S0 3, S1 4, S2 2, S3 4, S4 3, S5 2. Right: one S3, two S4, one S5, none for S0, S1 or S2.
+- Of the 12 no-claim lines: 5 had the right stage as their best guess but scored below the minimum (one 1.5 keyword), 5 had no
+  keyword at all, and 2 had a keyword for another stage.
+- **Seven of the 18 lines are about scams outside the two scenarios Mirage is built for** (electricity cut-off 3, TRAI /
+  SIM-block 2, a relative in trouble 2). The rules have no vocabulary for them and the template lines were never written
+  for them, though S2 to S5 tactics are scenario-neutral.
+- **Six lines use informal verb forms** (ruko, kholo, karo, bhejo, kaato, "tumhare"); the keyword lists were written in
+  polite forms (kijiye, kholiye, bhejiye).
+- Compared with set 1: tuning lifted set 1 from 13 to 25 of 27 but set 2 scored 4 of 18, which is what fitting to a seen set
+  looks like. The gap is the reason the held-out set exists.
+- **No rule has been changed in response.** Any change from here on is made with set 2 in view, which makes it a development
+  set too; a third file would then be needed for the next honest number.
+
+### Verb stems, a blueprint check of the weights, and scope (2 Nov 2026); OWNER set 2 is now a dev set
+
+**What changed.**
+- **Verb stems** (matched as the start of a word, so every politeness form counts), a short explicit list of verbs with a
+  distinctive stem, each below the minimum score so one stem can never move the call alone: S3 `bhej` (send: bhejiye, bhejo,
+  bhejna, bhejni; weight 1.5), `jama` (deposit; 1.5), `daal` (put money in; 1.0, and it also means lentils, which is harmless
+  alone); S2 `ruk` (wait: ruko, rukiye; 1.0); S4 `khol` (open an app or link; 1.0); plus the Devanagari forms. Stems of very common verbs (kar,
+  bol, de, le, ho, bata, dekh ...) and anything shorter than three characters are refused by the loader, because they would
+  match half of all Hindi sentences. The exact words `jama`, `rukiye`, `bhejiye`, `bhej do` were removed so they are not
+  counted twice. The minimum score stays at 2.
+- **Blueprint check of the weights** (against the stage tables in the blueprint, not against the owner's lines). Found and
+  changed: `drugs`, `narcotics` and `passport` are the HOOK ("a parcel holds drugs, passports or SIM cards"), so they moved
+  from S1 to S0, with `sim card` added; `funds` added to S3 ("verify funds"); `call transfer` added to S1 ("transfers you to an
+  officer"). Consistent already: parcel, courier, fedex, dhl, kyc and "bank se" (hook), cbi, police, officer, warrant, fir,
+  case (authority and documents), upi, ifsc, payment (payment), arrest and jail (fear). Not changed, noted: the blueprint's
+  isolation stage ("don't tell family", "don't hang up", Skype or WhatsApp video) has no stage words, and the FSM table has no
+  isolation state.
+- **Conflict left open: `customs`.** The blueprint lists customs among the authority officers (S1), but the rules count it as a
+  hook word (S0, 1.0). Moving it to S1 improved one set 2 line and removed one wrong claim, but it broke one invented line that
+  passed before ("customs se parcel ke baare mein call hai", written when I assumed customs was a hook). The rule was to revert
+  anything that breaks a passing line, so it is reverted. If the invented line's expectation is changed, `customs` can move.
+
+**Regression check, before and after** (same rules loader, invented set, owner sets 1 and 2, replay of the three practice calls):
+
+| | Before | After | Notes |
+|---|---|---|---|
+| Invented set (41) | 41 | 41 | nothing worse |
+| Owner set 1 (27) | 25 | 25 | nothing worse |
+| Owner set 2 (18) | 4 | **5** | the one new line is out of scope ("tumhare relative ... amount abhi bhejo", from the `bhej` stem) |
+| Owner set 2, in scope (11) | 4 | **4** | the fix did not help the covered scam types |
+| Owner set 2, out of scope (7) | 0 | 1 | |
+| Replay of the 3 practice calls (27 turns) | 1 generic stall | 1 | stages and tactics identical |
+
+The stems helped one line and did little else: most misses were a single keyword at 1.5 or less, or no keyword at all.
+
+**Scope.** Electricity cut-off, TRAI or SIM-block and relative-in-trouble calls are out of scope (the blueprint covers digital
+arrest, fake agencies, courier and bank KYC). Seven of the 18 set 2 lines are about them; the report prints them separately
+and leaves them out of the in-scope score. Written up in `docs/safety.md` as "only the scam types implemented are covered".
+
+**Set labels from now on:** set 1 "dev set, tuned, not a test"; set 2 "dev set after the fix; untouched score was 4 of 18"
+(frozen by hash, like set 1); set 3, `tests/fixtures/stage_cases_heldout_friend.txt`, written by the friend who plays the
+scammer, empty, "held out". The report prints only counts for set 3 until the owner says its misses may be shown.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

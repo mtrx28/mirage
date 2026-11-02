@@ -60,6 +60,7 @@ def _phrase(text: str) -> tuple[str, ...]:
 @dataclass(frozen=True)
 class Rules:
     min_score: float
+    stems: dict[str, list[tuple[str, str, float]]]    # stage -> (label, normalised stem, weight); matched as a word START
     stickiness: dict[str, float]     # per stage: the bonus the current stage gets
     back_margin: float
     prev_weight: float
@@ -73,11 +74,32 @@ class Rules:
     own_direct: list[tuple[str, list[tuple[str, ...]]]]    # phrases that ask for a fact without "aapka ... bataiye"
 
 
+# Stems of very common verbs would match half of all Hindi sentences, so the loader refuses them.
+COMMON_VERB_STEMS = {norm_word(w) for w in (
+    "kar", "kare", "kiy", "bol", "bata", "bataa", "de", "di", "le", "li", "ho", "hu", "hai", "rah", "aa", "aay", "ja", "jaa",
+    "dekh", "sun", "mil", "lag", "chal", "kah", "rakh", "uth", "pad", "aap", "mai", "main", "kya", "tha", "the",
+    "कर", "बोल", "बता", "दे", "ले", "हो", "रह", "आ", "जा", "देख", "सुन", "मिल", "चल", "कह", "रख")}
+
+
+def _load_stems(raw_stems: dict) -> dict[str, list[tuple[str, str, float]]]:
+    out: dict[str, list[tuple[str, str, float]]] = {}
+    for stage, words in raw_stems.items():
+        if stage.startswith("_"):
+            continue
+        for label, weight in words.items():
+            stem = norm_word(label)
+            if len(stem) < 3 or stem in COMMON_VERB_STEMS:
+                raise ValueError(f"stem {label!r} is too short or too common a verb to match as a word start")
+            out.setdefault(stage, []).append((label, stem, weight))
+    return out
+
+
 def load_rules(path: Path = RULES_PATH) -> Rules:
     raw = json.loads(path.read_text(encoding="utf-8"))
     own = raw["signals"]["own_detail"]
     return Rules(
-        raw["min_score"], raw["stickiness_by_stage"], raw["back_margin"], raw["previous_utterance_weight"],
+        raw["min_score"], _load_stems(raw.get("stems", {})), raw["stickiness_by_stage"], raw["back_margin"],
+        raw["previous_utterance_weight"],
         raw["finding_boosts"],
         {s: [(w, _phrase(w), weight) for w, weight in words.items()] for s, words in raw["stages"].items()},
         {name: [_phrase(w) for w in words] for name, words in raw["scenario"].items()},
@@ -98,6 +120,10 @@ def score_text(rules: Rules, text: str) -> tuple[dict[str, float], dict[str, lis
             if phrase and _has(tokens, phrase):
                 scores[stage] += weight
                 hits[stage].append(f"{label} +{weight:g}")
+        for label, stem, weight in rules.stems.get(stage, []):
+            if any(t.startswith(stem) for t in tokens):          # bhej -> bhejiye, bhejo, bhejna, bhejni ...
+                scores[stage] += weight
+                hits[stage].append(f"{label}* +{weight:g}")
     return scores, hits
 
 

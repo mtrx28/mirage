@@ -12,15 +12,15 @@
   "stages": {
     "S0": {
       "namaste": 0.5, "namaskar": 0.5, "hello": 0.5, "नमस्ते": 0.5, "हेलो": 0.5,
-      "parcel": 1.5, "पार्सल": 1.5, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5, "customs": 1.0,
+      "parcel": 1.5, "पार्सल": 1.5, "drugs": 1.5, "ड्रग्स": 1.5, "narcotics": 1.5, "passport": 1.0, "sim card": 1.0, "courier": 1.5, "कूरियर": 1.5, "fedex": 1.5, "dhl": 1.5, "customs": 1.0,
       "kyc": 1.5, "केवाईसी": 1.5, "bank se": 1.0, "aapke naam": 1.0, "naam se": 0.5,
       "bol raha hoon": 1.0, "bol rahi hoon": 1.0, "calling from": 1.0,
       "department": 1.0, "delivery": 1.0, "pending": 1.0, "order": 1.0
     },
     "S1": {
       "arrest": 2.0, "giraftar": 2.0, "गिरफ्तार": 2.0, "warrant": 2.0, "वारंट": 2.0,
-      "cbi": 2.0, "सीबीआई": 2.0, "police": 1.5, "पुलिस": 1.5, "crime branch": 2.0,
-      "narcotics": 1.5, "drugs": 1.5, "ड्रग्स": 1.5, "money laundering": 2.0,
+      "cbi": 2.0, "सीबीआई": 2.0, "call transfer": 1.5, "police": 1.5, "पुलिस": 1.5, "crime branch": 2.0,
+      "money laundering": 2.0,
       "case": 1.5, "केस": 1.5, "fir": 1.5, "officer": 1.0, "inspector": 1.0, "ऑफिसर": 1.0, "senior officer": 1.5,
       "legal": 1.5, "court": 1.5, "कोर्ट": 1.5, "jail": 2.0, "जेल": 2.0,
       "aapke khilaf": 2.0, "against you": 2.0,
@@ -31,14 +31,14 @@
       "kitna time": 2.0, "kab tak": 1.5, "kahan gaye": 2.0, "kahan ho": 1.5, "line par": 1.5, "line pe": 1.5,
       "hold": 1.0, "intezaar": 1.5, "wait": 1.0, "sun rahe hain": 1.0, "sun rahe ho": 1.0,
       "jaldi dhoondhiye": 2.0, "jaldi": 1.0, "time waste": 1.0,
-      "hold kijiye": 2.0, "rukiye": 1.0, "rahiye": 1.0, "network": 1.0
+      "hold kijiye": 2.0, "rahiye": 1.0, "network": 1.0
     },
     "S3": {
       "paise": 2.0, "rupaye": 1.5, "amount": 1.5, "lakh": 1.5, "payment": 3.0, "पेमेंट": 3.0,
-      "transfer": 2.0, "ट्रांसफर": 2.0, "bhejiye": 1.5, "bhej do": 1.5, "jama": 1.5, "deposit": 1.5,
+      "transfer": 2.0, "ट्रांसफर": 2.0, "deposit": 1.5,
       "upi": 3.0, "यूपीआई": 3.0, "ifsc": 3.0, "आईएफएससी": 3.0, "account number": 2.5, "account": 1.0,
       "अकाउंट": 1.0, "खाता": 1.0, "rbi": 1.5, "safe account": 3.0, "secure account": 3.0,
-      "verification amount": 3.0, "refundable": 1.5, "refund": 1.0, "qr": 1.5, "scan": 1.0,
+      "verification amount": 3.0, "funds": 1.0, "refundable": 1.5, "refund": 1.0, "qr": 1.5, "scan": 1.0,
       "gpay": 2.5, "google pay": 2.5, "phonepe": 2.5, "paytm": 1.5
     },
     "S4": {
@@ -57,6 +57,12 @@
       "theek hai baad mein": 2.0, "thik hai baad mein": 2.0,
       "call cut": 2.0, "call band": 2.0, "chhodo": 1.0, "dobara call": 1.5
     }
+  },
+  "stems": {
+    "_about": "Verb STEMS, matched as the start of a word, so every politeness form counts (bhejiye, bhejo, bhejna, bhejni). Only a short explicit list of verbs whose stem is distinctive. Very common verbs (kar, bol, de, le, ho, bata, dekh ...) are refused by the loader, because their stems would match half of all Hindi sentences. Each stem counts once per line.",
+    "S2": {"ruk": 1.0, "रुक": 1.0},
+    "S3": {"bhej": 1.5, "भेज": 1.5, "jama": 1.5, "जमा": 1.5, "daal": 1.0},
+    "S4": {"khol": 1.0, "खोल": 1.0}
   },
   "scenario": {
     "digital_arrest": ["parcel", "पार्सल", "courier", "customs", "fedex", "dhl", "cbi", "सीबीआई", "narcotics", "drugs", "arrest", "giraftar", "warrant", "police", "पुलिस", "passport", "crime branch", "money laundering"],

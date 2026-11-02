@@ -6,3 +6,23 @@
 #
 # Do not tune any rule against this file. Its score is the honest "closer to a real caller" number; the moment
 # a rule is changed after reading these lines, start a third file.
+
+
+S0 | hello ji electricity office se bol rahe hain
+S0 | sir TRAI complaint ke baare mein baat karni thi
+S0 | aapke cousin ka phone aaya tha mere paas
+S1 | aaj raat bijli kat jayegi agar dues clear nahi kiye
+S1 | aapka number band hone wala hai TRAI se notice aaya hai
+S1 | customs mein aapka parcel rok diya gaya hai aur case banega
+S1 | police wale aapke ghar aa sakte hain agar jawab nahi diya
+S2 | ek minute ruko main control room mein pooch ke batata hoon
+S2 | abhi call mat kaato thodi der mein wapas phone karta hoon
+S3 | light chalu rakhni hai toh is number par bill jama karo 00001234
+S3 | parcel release karne ke liye customs fee bhejni padegi
+S3 | ye upi id likh lo aur paise transfer kar do
+S3 | tumhare relative ko chhudana hai toh amount abhi bhejo
+S4 | jaldi karo sir bas paanch minute bache hain
+S4 | app kholo aur jo screen pe aa raha hai woh karo
+S4 | OTP daalo warna request cancel ho jayegi
+S5 | theek hai bhai rehne do main call kaat raha hoon
+S5 | aap nahi maan rahe toh ab main kuch nahi kar sakta
