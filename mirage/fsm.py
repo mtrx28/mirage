@@ -70,6 +70,7 @@ class Rules:
     own_possessive: set[str]
     own_request: set[str]
     own_facts: list[tuple[str, list[tuple[str, ...]]]]
+    own_direct: list[tuple[str, list[tuple[str, ...]]]]    # phrases that ask for a fact without "aapka ... bataiye"
 
 
 def load_rules(path: Path = RULES_PATH) -> Rules:
@@ -83,6 +84,7 @@ def load_rules(path: Path = RULES_PATH) -> Rules:
         {name: [_phrase(w) for w in words] for name, words in raw["signals"].items() if isinstance(words, list)},
         {norm_word(w) for w in own["possessive"]}, {norm_word(w) for w in own["request"]},
         [(fact, [_phrase(w) for w in words]) for fact, words in own["facts"]],
+        [(fact, [_phrase(w) for w in words]) for fact, words in own.get("direct", [])],
     )
 
 
@@ -99,12 +101,39 @@ def score_text(rules: Rules, text: str) -> tuple[dict[str, float], dict[str, lis
     return scores, hits
 
 
+def finding_boost(rules: Rules, f: Finding) -> tuple[str, float] | None:
+    """A finding is strong evidence: a payment identifier means S3, a case number means S1."""
+    group = "payment_identifier" if f.kind in PAYMENT_KINDS else "case" if f.kind == "case" else None
+    if group is None:
+        return None
+    return next(iter(rules.boosts[group].items()))
+
+
 def raw_stage(rules: Rules, text: str) -> str | None:
     """The stage the words alone point to (no history, no allowed-move rules), or None below the minimum score.
-    Used by the stage-detection test sets."""
+    On a tie the later stage wins, as in decide_stage."""
     scores, _ = score_text(rules, text)
-    best = max(STAGES, key=lambda s: scores[s])
+    best = max(STAGES, key=lambda s: (scores[s], STAGES.index(s)))
     return best if scores[best] >= rules.min_score else None
+
+
+def line_scores(rules: Rules, text: str, synthetic_mode: bool = False) -> dict[str, float]:
+    """Scores for ONE line the way the brain sees it with no history: its words plus what the extractor finds in it."""
+    scores, _ = score_text(rules, text)
+    for f in extract_intel([Transcript(text, 0.0)], synthetic_mode=synthetic_mode):
+        boost = finding_boost(rules, f)
+        if boost:
+            scores[boost[0]] += boost[1]
+    return scores
+
+
+def line_stage(rules: Rules, text: str) -> tuple[str | None, str | None, float]:
+    """(stage claimed, weak stage, weak score) for one line, no history. `stage claimed` is None below the minimum
+    score; `weak stage` is the best stage with any score at all, so a near miss can be reported as one."""
+    scores = line_scores(rules, text)
+    best = max(STAGES, key=lambda s: (scores[s], STAGES.index(s)))
+    claimed = best if scores[best] >= rules.min_score else None
+    return claimed, (best if scores[best] > 0 else None), scores[best]
 
 
 @dataclass(frozen=True)
@@ -117,7 +146,7 @@ class StageDecision:
 
 
 def decide_stage(rules: Rules, current: str, scores: dict[str, float], reasons: list[str],
-                 evidence: bool = True) -> StageDecision:
+                 evidence: bool = True, current_stage_hit: bool = False) -> StageDecision:
     """Pick the new stage. The current stage gets a stickiness bonus; a move needs the minimum score; S4 can only be
     entered from S3 or S4; a move back needs a bigger margin and only goes one step.
 
@@ -144,7 +173,9 @@ def decide_stage(rules: Rules, current: str, scores: dict[str, float], reasons: 
         if scores[best] > 0:
             note = f"{best} scored {scores[best]:g}, below the minimum {rules.min_score:g}: stay"
         best = current
-    matched = max(scores.values()) >= rules.min_score
+    # "matched" decides whether the stage's own tactics apply (or only a generic stall). Weak evidence for the stage the
+    # call is ALREADY in is enough for that (one hook word in S0); the minimum score only gates MOVING to another stage.
+    matched = max(scores.values()) >= rules.min_score or current_stage_hit
     out = list(reasons)
     if note:
         out.append(note)
@@ -165,6 +196,11 @@ def detect_signals(rules: Rules, text: str) -> Signals:
     own_fact = None
     if any(t in rules.own_possessive for t in tokens) and any(t in rules.own_request for t in tokens):
         for fact, phrases in rules.own_facts:
+            if any(_has(tokens, p) for p in phrases):
+                own_fact = fact
+                break
+    if own_fact is None:
+        for fact, phrases in rules.own_direct:
             if any(_has(tokens, p) for p in phrases):
                 own_fact = fact
                 break
@@ -312,14 +348,16 @@ class CallBrain:
         prev_scores, _ = score_text(self.rules, st.prev_text) if st.prev_text else ({s: 0.0 for s in STAGES}, {})
         scores = {s: scores[s] + self.rules.prev_weight * prev_scores[s] for s in STAGES}
         reasons = [f"{s}: " + ", ".join(h) for s, h in hits.items() if h]
+        current_stage_hit = bool(hits[st.stage])
         for f in findings:
-            boost = self._boost(f)
+            boost = finding_boost(self.rules, f)
             if boost:
                 stage, amount = boost
                 scores[stage] += amount
                 evidence = True
+                current_stage_hit = current_stage_hit or stage == st.stage
                 reasons.append(f"{stage}: finding {f.kind} +{amount:g}")
-        decision = decide_stage(self.rules, st.stage, scores, reasons, evidence)
+        decision = decide_stage(self.rules, st.stage, scores, reasons, evidence, current_stage_hit)
 
         if st.scenario == "undecided":
             st.scenario = detect_scenario(self.rules, text) or "undecided"
@@ -340,15 +378,6 @@ class CallBrain:
         return Turn(decision, st.scenario, signals.names, findings, plan, self.reply_wait_s())
 
     # ------------------------------------------------------------------ pieces of a turn
-
-    def _boost(self, f: Finding) -> tuple[str, float] | None:
-        if f.kind in PAYMENT_KINDS:
-            for stage, amount in self.rules.boosts["payment_identifier"].items():
-                return stage, amount
-        if f.kind == "case":
-            for stage, amount in self.rules.boosts["case"].items():
-                return stage, amount
-        return None
 
     def _record_intel(self, findings: tuple[Finding, ...]) -> None:
         for f in findings:

@@ -213,6 +213,24 @@ after it has been spoken.
   spaced numerals (`FSMConfig.digit_style`). Compare both on one small Timbre test before any pre-rendering.
 - Read-back lines run past 80 characters once spoken digits are in them. That is expected (they are always synthesised live).
 
+### First real-caller measurement of the stage rules (2 Nov 2026), recorded BEFORE any change
+
+The owner wrote 27 caller lines (`tests/fixtures/stage_cases_user.txt`) without looking at the keyword list. Scored on
+the words of each single line, **11 of 27 matched**. That is the honest "closer to a real caller" number for the rules as
+first written; it is not an accuracy figure (27 lines, one writer, one line at a time). After fixing two defects in how
+the TEST scored lines (a tie went to the wrong stage, and the extractor's findings were ignored) the same rules scored
+13 of 27. Of the 14 misses: 6 had the right stage as their best guess but scored below the minimum of 2 (a single
+keyword weighing 1.5), 2 went to the wrong stage with enough score (one more hook word than fear words; "hold" read as
+S1 authority), 3 had no keyword at all, and 3 had a keyword for a different stage as their best guess. **From the moment keywords are
+changed after reading these lines, this set is a development set and no longer a fair test**: a fresh held-out set
+(`tests/fixtures/stage_cases_heldout.txt`) is reserved for the next honest measurement.
+
+Bugs found by the same runner session (fixed; none of them involved fitting keywords to the owner's lines):
+a tie between stages went to the earlier stage in the test helper but to the later one in the brain; a line with a weak
+keyword of the stage the call was already in (one hook word in S0) got a generic stall instead of that stage's tactic; the
+stage test ignored the extractor's findings that the brain uses; the signal for "tell me your address" missed
+"aap kahan rehte hain" and "confirm".
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

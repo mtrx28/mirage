@@ -1,0 +1,8 @@
+# SECOND set of stage-detection cases, kept HELD OUT.
+#
+# Write these only after the keyword rules have been changed for the first set, and WITHOUT looking at
+# content/stage_rules.json or at the first set's results. One case per line:   STAGE | what the scammer says
+# STAGE is S0, S1, S2, S3, S4 or S5. Lines starting with # are ignored. Hinglish in Latin or Devanagari script.
+#
+# Do not tune any rule against this file. Its score is the honest "closer to a real caller" number; the moment
+# a rule is changed after reading these lines, start a third file.

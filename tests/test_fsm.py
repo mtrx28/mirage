@@ -491,3 +491,28 @@ def test_the_runner_joins_a_dictation_given_with_plus():
 def test_the_runner_stays_off_the_llm_unless_asked():
     out = run_runner("hello\n")
     assert "LLM off" in out and "WARNING" not in out
+
+
+# ---------------------------------------------------------------- found in the owner's runner session
+
+def test_weak_evidence_for_the_stage_the_call_is_already_in_gets_that_stages_tactic_not_a_stall():
+    brain = CallBrain(seed=1)
+    run(brain, ["hello"])
+    turn = say(brain, "Kya aapne Mumbai se koi parcel order kiya tha?")          # one hook word (1.5, below the minimum of 2)
+    assert turn.stage.stage == "S0" and turn.plan.tactic == "mishear_name"
+
+
+def test_weak_evidence_for_a_different_stage_does_not_move_it_and_still_stalls():
+    brain = at_stage("S1")
+    turn = say(brain, "Please line par rahiye, main details check karta hoon")    # S2 word at 1.5: below the minimum
+    assert turn.stage.stage == "S1" and turn.plan.tactic == "generic_stall"
+
+
+@pytest.mark.parametrize("ask, key", [("aap kahan rehte hain?", "address"), ("apna account number confirm kijiye", "account"),
+                                      ("aap kis bank mein hain", "bank"), ("aapka naam kya hai", "name")])
+def test_more_ways_of_asking_for_uncles_own_detail(ask, key):
+    brain = at_stage("S3")
+    turn = say(brain, ask)
+    assert turn.plan.tactic == "give_own_detail", turn.plan
+    assert load_persona().fact(key).label in turn.plan.text
+    assert_traceable(turn.plan, brain)

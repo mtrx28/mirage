@@ -65,7 +65,12 @@
     "emergency": ["emergency", "ambulance", "hospital", "accident", "heart attack", "suicide", "died", "death", "maut", "इमरजेंसी", "एम्बुलेंस", "अस्पताल", "दुर्घटना", "हादसा", "आत्महत्या"],
     "own_detail": {
       "possessive": ["aapka", "aapki", "aapke", "apna", "apni", "apne", "your", "आपका", "आपकी", "आपके", "अपना", "अपनी", "अपने", "tumhara"],
-      "request": ["bataiye", "batao", "bataye", "boliye", "bolo", "dijiye", "do", "share", "send", "batana", "bata", "likhiye", "likhwaiye", "tell", "give", "de", "denge", "bhejiye"],
+      "request": ["bataiye", "batao", "bataye", "batayiye", "bataiyega", "boliye", "bolo", "dijiye", "do", "share", "send", "batana", "bata", "likhiye", "likhwaiye", "tell", "give", "de", "denge", "bhejiye", "confirm", "verify", "enter"],
+      "direct": [
+        ["address", ["kahan rehte", "kahan rahte", "kahan rehta", "kis jagah"]],
+        ["bank", ["kis bank", "kaun se bank", "kaunsa bank", "kaun sa bank"]],
+        ["name", ["naam kya", "kya naam"]]
+      ],
       "facts": [
         ["account", ["account", "अकाउंट", "खाता"]],
         ["ifsc", ["ifsc", "आईएफएससी"]],

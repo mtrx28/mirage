@@ -11,3 +11,33 @@
 # The stage-detection test (written with the state machine) reports this file's results SEPARATELY from the
 # invented test set. Neither is an accuracy figure: the invented set shows that "the rules do what I designed",
 # this one shows how the rules fare on something "closer to a real caller".
+
+
+
+S0 | Namaste sir, main courier department se bol raha hoon
+S0 | Aapka ek parcel delivery ke liye pending hai
+S0 | Kya aapne Mumbai se koi parcel order kiya tha
+S1 | Aapke naam se ek suspicious parcel pakda gaya hai
+S1 | Is case mein police department ki inquiry chal rahi hai
+S1 | Aapka naam case number 00001234 mein mention hai
+S2 | Ek minute hold kijiye, main senior officer se baat karwata hoon
+S3 | Case clear karne ke liye is UPI ID par payment bhejiye
+S0 | Hello sir, main bank verification department se bol raha hoon
+S1 | Aapka bank KYC expire ho gaya hai
+S1 | Aaj verification nahi hua toh aapka account block ho jayega
+S2 | Please line par rahiye, main details check karta hoon
+S3 | Ab apna account number confirm kijiye
+S3 | Payment verification ke liye is UPI ID par paise bhejiye
+S3 | Aapko 500 rupaye verification ke liye transfer karne hain
+S4 | Jaldi kijiye sir, offer sirf do minute ke liye hai
+S4 | App kholiye aur OTP enter kijiye
+S5 | Theek hai sir, aap verification nahi karna chahte toh call band karta hoon
+S0 | Hello hello sir, sun rahe ho kya
+S1 | Dekhiye aapke against complaint register hua hai
+S1 | Main officer bol raha hoon, aapko police station aana padega
+S2 | Rukiye zara, network problem hai, main dobara call karta hoon
+S3 | Ab account details bataiye aur transfer kijiye
+S3 | Mera UPI ID note karo, payment abhi karna hai
+S4 | Arre jaldi karo, time khatam ho raha hai
+S4 | OTP batao, nahi toh account band ho jayega
+S5 | Chhodo yaar, aap phone mat uthao, main call cut karta hoon
