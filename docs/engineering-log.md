@@ -376,6 +376,40 @@ spoken digit string uses the configured style: Uncle's own details from the fact
 number in the address) and read-backs of the caller's digits, and a test checks this. Replies now contain numerals, so the
 safety gate will compare digits after stripping spaces and commas.
 
+### Safety gate, first stop (2 Nov 2026)
+
+Built: `mirage/safety.py` (output checks, resolution of `needs_gate`, a provisional scam score), `content/gate_lines.json`
+(the gate's own lines, with their own lint: `python -m mirage.safety`), `content/gate_rules.json` (abuse and threat word lists,
+a starter list for the owner to extend), a `GateConfig` in `mirage/config.py`, and the hook wired into the FSM as
+`gate(plan, state, context)`. The runner uses the gate by default; `--no-gate` shows the raw brain. Not built yet (second
+stop): the exit rule for callers who do not look like scammers, the calibration printout, the red-team runner and the
+README disclosure notes.
+
+- **Every reply is checked before it is spoken** (templates, persona answers, anything a model writes): each digit must trace
+  to the fact sheet, the caller's own findings (quote and index), or the gate's emergency number, and the gate re-verifies
+  those sources instead of trusting them; spaces and commas are stripped before comparing; no "@" or link; no real-looking
+  mobile, Aadhaar-style or PAN number unless it is the caller's own; no claim to be human or to be "not an AI"; no request for
+  money or credentials; no "already sent or installed"; no impersonating an official or threatening; persona intact (Latin
+  script, no mention of prompts or models, tags as allowed, length); an obstacle line needs its trigger. A failed check is
+  replaced by a neutral stall, and if even that fails the gate says nothing and ends the call.
+- **Identity asks:** a question about the speaker (an AI or human word together with "you", "this" or a cue like "ho kya").
+  With a scam score below `identity_disclose_below` (1.0, a guess) the first ask gets the honest answer and the call ends;
+  with more evidence Uncle gives up to `max_deflections` (2) in-persona deflections, then the honest answer. Emergencies exit
+  at once, at any time, with "112". Abusive or violent callers get calm answers, then a goodbye (or the honest answer if there
+  is little scam evidence). Arrest threats are scam content, not hostility.
+- **112 is UNVERIFIED.** I found only secondary sources (news reports and a state police page) that 112 is India's single
+  emergency number under the ERSS system; I did not find an official MHA or PIB page. Verify before relying on it. It is a
+  config value (`emergency_number`).
+- **The scam score is provisional.** Its formula is in `GateConfig` and in the plan, every weight is a guess, and it is
+  used only for the identity and hostility decisions so far. It rests on the keyword layer (set 3: 12 of 20), so it will
+  under-count real scams; calibration against the practice calls and the friend's 5 scam and 5 benign scripts is the second stop.
+- **Two bugs the gate tests found in my own code:** the gate treated the goodbye turn itself as "the call already ended" (the FSM
+  marked the call ended before calling the gate), and it blocked Uncle's legitimate spoken address ("Flat 1 2, Mirage
+  Apartments") because the project name in the fact sheet was flagged as a meta word. Both fixed; a test now runs a whole
+  scripted call and requires every turn to pass the gate unchanged.
+- **Unresolved:** a deflection is an in-persona evasion, not a denial; no legal opinion has been taken on it and disclosure
+  rules vary by place (this goes in `docs/safety.md` at the second stop).
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

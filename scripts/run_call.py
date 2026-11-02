@@ -1,6 +1,7 @@
 """Talk to Rajesh Uncle in the terminal. You type what the scam caller says; it shows what the brain decided.
 
-No audio and no network. (The LLM fallback is off; --llm turns it on and DOES call Gemini.)
+No audio and no network. The safety gate is ON (--no-gate shows what the brain says without it). The LLM fallback
+is off; --llm turns it on and DOES call Gemini.
 
 Typing:
   some text            the caller says it; Uncle replies
@@ -22,6 +23,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from mirage.config import FSMConfig  # noqa: E402
 from mirage.fsm import CallBrain  # noqa: E402
+from mirage.safety import Gate  # noqa: E402
 
 SECONDS_PER_WORD = 0.45     # a made-up speaking speed, so joined lines get believable timings
 
@@ -61,13 +63,18 @@ def show_turn(turn) -> None:
             print(f"            {f.kind} {f.value!r} [{f.confidence}] quote={f.quote!r}")
     if plan.needs_gate:
         print("  *** NEEDS GATE: " + str(plan.gate_reason) + " ***")
-        print("  No line was produced. The safety gate does not exist yet, so Uncle says nothing here.")
+        print("  No line was produced. The safety gate is off (--no-gate), so Uncle says nothing here.")
     else:
         print(f"  tactic:   {plan.tactic}  ({plan.why})")
         print(f"  source:   {plan.source}" + (f"  line {plan.line_id}" if plan.line_id else ""))
-        print(f"  Uncle:    {plan.text}")
+        if plan.gate_action:
+            print(f"  GATE:     {plan.gate_action}: {'; '.join(plan.gate_notes)}")
+        print(f"  Uncle:    {plan.text if plan.text else '(nothing: the gate failed closed or the call is over)'}")
+        if plan.end_call:
+            print("  *** THE CALL ENDS HERE ***")
         for s in plan.digit_sources:
-            origin = f"persona.{s.field}" if s.origin == "persona" else f"caller's words {s.quote!r}"
+            origin = (f"persona.{s.field}" if s.origin == "persona" else f"the gate's config ({s.field})"
+                      if s.origin == "gate" else f"caller's words {s.quote!r}")
             print(f"            digits {s.digits!r} came from {origin}")
     mode = " (digit mode)" if turn.wait_s > FSMConfig().normal_wait_s else ""
     print(f"  wait before the next reply: {turn.wait_s:g} s{mode}")
@@ -78,6 +85,7 @@ def main() -> None:
                                 epilog="\n".join(__doc__.split("\n")[2:]))
     p.add_argument("--scenario", choices=["digital_arrest", "bank_kyc"], help="force the scenario instead of detecting it")
     p.add_argument("--llm", action="store_true", help="turn the Gemini fallback ON (it calls the network; off by default)")
+    p.add_argument("--no-gate", action="store_true", help="run WITHOUT the safety gate (for looking at the raw brain only)")
     p.add_argument("--synthetic", action="store_true", help="accept the staged 00-prefixed phone numbers")
     p.add_argument("--seed", type=int, default=0, help="seed for choosing between line variants")
     p.add_argument("--digit-wait", type=float, default=FSMConfig().digit_wait_s, help="seconds to wait in digit mode")
@@ -89,10 +97,11 @@ def main() -> None:
         router = build_router()
         print("WARNING: --llm is on. Stall questions may be sent to Gemini (free tier, counted against your budget).")
     cfg = FSMConfig(digit_wait_s=args.digit_wait, synthetic_mode=args.synthetic)
-    brain = CallBrain(config=cfg, scenario=args.scenario, seed=args.seed, router=router, llm_enabled=args.llm)
+    gate = None if args.no_gate else Gate(digit_style=cfg.digit_style, seed=args.seed)
+    brain = CallBrain(config=cfg, scenario=args.scenario, seed=args.seed, router=router, llm_enabled=args.llm, gate=gate)
 
     print("Rajesh Uncle, terminal mode. Type the caller's line. :quit to stop. No audio, no network"
-          + (", LLM ON." if args.llm else ", LLM off."))
+          + (", LLM ON" if args.llm else ", LLM off") + (", GATE OFF." if args.no_gate else ", gate on."))
     t = 0.0
     previous_was_continuation = False
     while True:

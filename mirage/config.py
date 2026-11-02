@@ -68,6 +68,31 @@ class FSMConfig:
 
 
 @dataclass(frozen=True)
+class GateConfig:
+    """The safety gate. EVERY number here is a GUESS, to be calibrated (see docs/engineering-log.md)."""
+    # identity questions ("are you a person or an AI?")
+    max_deflections: int = 2               # in-persona deflections allowed; the ask after these gets the honest answer
+    identity_disclose_below: float = 1.0   # a scam score under this: answer honestly at the FIRST sincere ask, even early
+    # abuse and threats of violence (arrest threats are scam content, not abuse)
+    max_hostile_turns: int = 3             # calm answers for the first (max - 1) hostile turns, then say goodbye
+    # emergencies
+    emergency_always_exits: bool = True
+    emergency_number: str = "112"          # India's single emergency number: secondary sources only, UNVERIFIED (see log)
+    # reply limits (a digit read-back is longer than a template line)
+    max_reply_chars: int = 200
+    # the scam score, used to decide how much scam evidence a call has so far (points, capped; all guesses)
+    stage_points: tuple[float, ...] = (0.0, 1.0, 1.5, 3.0, 3.5, 3.5)   # by the highest stage reached, S0 to S5
+    payment_identifier_points: float = 2.0
+    case_number_points: float = 1.0
+    amount_points: float = 0.5
+    signal_points: float = 1.0             # per distinct ask: OTP, install, credential
+    signal_points_cap: float = 3.0
+    word_points: float = 0.25              # per distinct authority or urgency keyword
+    word_points_cap: float = 1.5
+    scenario_points: float = 0.5           # once a scenario (digital arrest, bank KYC) is decided
+
+
+@dataclass(frozen=True)
 class LLMConfig:
     models: tuple[ModelBudget, ...] = MODELS
 

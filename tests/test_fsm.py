@@ -431,13 +431,14 @@ def test_a_sincere_identity_question_or_an_emergency_gets_no_line(line, reason):
 def test_the_gate_hook_sees_every_plan_and_its_replacement_is_used():
     seen = []
 
-    def gate(plan, state):
-        seen.append(plan)
+    def gate(plan, state, ctx):
+        seen.append((plan, ctx))
         return replace(plan, text="GATED") if plan.text else plan
 
     brain = CallBrain(gate=gate)
     turns = run(brain, ["hello", "are you a robot?", "arrest warrant hai"])
-    assert len(seen) == 3 and seen[1].needs_gate
+    assert len(seen) == 3 and seen[1][0].needs_gate
+    assert [c.turn for _, c in seen] == [0, 1, 2] and seen[1][1].text == "are you a robot?"
     assert turns[0].plan.text == "GATED" and turns[1].plan.text == ""
 
 
@@ -510,9 +511,15 @@ def test_the_runner_shows_stage_tactic_line_and_findings_without_the_network():
     assert "wait before the next reply" in out
 
 
-def test_the_runner_prints_needs_gate_clearly():
+def test_the_runner_prints_needs_gate_clearly_when_the_gate_is_off():
+    out = run_runner("hello\nare you a robot?\n", "--no-gate")
+    assert "NEEDS GATE: ai_question" in out and "gate is off" in out and "GATE OFF" in out
+
+
+def test_the_runner_uses_the_gate_by_default_and_shows_what_it_did():
     out = run_runner("hello\nare you a robot?\n")
-    assert "NEEDS GATE: ai_question" in out and "does not exist yet" in out
+    assert "gate on" in out and "GATE:     disclose" in out and "automated assistant" in out
+    assert "THE CALL ENDS HERE" in out and "NEEDS GATE" not in out
 
 
 def test_the_runner_joins_a_dictation_given_with_plus():

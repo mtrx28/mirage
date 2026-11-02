@@ -57,6 +57,11 @@ def _phrase(text: str) -> tuple[str, ...]:
     return tuple(words_of(text))
 
 
+# public names for the safety gate, which matches words the same way
+has_phrase = _has
+phrase_tokens = _phrase
+
+
 @dataclass(frozen=True)
 class Rules:
     min_score: float
@@ -149,6 +154,7 @@ class LineScore:
     reasons: list[str]
     evidence: bool              # did THIS line contain any stage keyword or finding?
     current_stage_hit: bool     # ... and did any of it point at the stage the call is already in?
+    hits: dict[str, list[str]]  # the keywords found, per stage, as "word +weight"
 
 
 def score_line(rules: Rules, text: str, findings, prev_text: str = "", current: str | None = None) -> LineScore:
@@ -170,7 +176,7 @@ def score_line(rules: Rules, text: str, findings, prev_text: str = "", current: 
             evidence = True
             current_stage_hit = current_stage_hit or stage == current
             reasons.append(f"{stage}: finding {f.kind} +{amount:g}")
-    return LineScore(scores, reasons, evidence, current_stage_hit)
+    return LineScore(scores, reasons, evidence, current_stage_hit, hits)
 
 
 def line_scores(rules: Rules, text: str, synthetic_mode: bool = False) -> dict[str, float]:
@@ -276,7 +282,7 @@ class DigitSource:
     """Where one spoken digit string came from. `spoken` is exactly how it appears in the reply text."""
     digits: str
     spoken: str
-    origin: str                     # "persona" or "caller"
+    origin: str                     # "persona", "caller", or "gate" (the gate's own emergency number)
     field: str | None = None        # persona fact key
     quote: str | None = None        # the caller's words (a Finding's quote)
     source_index: int | None = None
@@ -296,6 +302,9 @@ class ReplyPlan:
     expected: str | None = None     # what Uncle just asked for, passed to the extractor on the caller's next line
     why: str = ""                   # one sentence: why this tactic
     awaiting_digits: bool = False   # Uncle asked for digits: wait longer before replying to the next transcript
+    gate_action: str | None = None  # set by the safety gate: replaced, deflect, disclose, hostile_calm, hostile_goodbye ...
+    end_call: bool = False          # the call is over after this reply
+    gate_notes: tuple[str, ...] = ()  # why the gate acted (violations found, which rule fired)
 
 
 @dataclass(frozen=True)
@@ -329,6 +338,22 @@ class CallState:
     awaiting_digits: bool = False
     last_llm_turn: int = -100
     ended: bool = False
+    # kept for the safety gate
+    max_stage: int = 0                                  # index of the highest stage reached (S0 = 0)
+    signals_seen: set[str] = field(default_factory=set)
+    stage_words: set[str] = field(default_factory=set)  # distinct authority (S1) and urgency (S4) keywords heard
+    identity_asks: int = 0                              # sincere "are you a person or an AI?" questions so far
+    hostile_turns: int = 0
+    gate_log: list[dict] = field(default_factory=list)  # one record per gate decision
+
+
+@dataclass(frozen=True)
+class GateContext:
+    """What the safety gate is told about the caller's last turn."""
+    text: str
+    findings: tuple[Finding, ...]
+    signals: tuple[str, ...]
+    turn: int
 
 
 @dataclass
@@ -340,7 +365,7 @@ class _Choice:
     readback: Finding | None = None
 
 
-Gate = Callable[[ReplyPlan, CallState], ReplyPlan]
+Gate = Callable[[ReplyPlan, CallState, GateContext], ReplyPlan]
 
 
 class CallBrain:
@@ -357,7 +382,9 @@ class CallBrain:
         self.rng = random.Random(seed)
         self.router = router
         self.llm_enabled = llm_enabled            # OFF by default: its latency is not measured yet
-        self.gate: Gate = gate or (lambda plan, state: plan)   # the safety gate will be plugged in here
+        # No gate means the raw plan comes back (needs_gate plans stay empty). Anything that speaks to a real caller
+        # must pass mirage.safety.Gate(); the runner does by default.
+        self.gate: Gate = gate or (lambda plan, state, ctx: plan)
         self.transcripts: list[Transcript] = []
         self._what = {o.key: o for o in self.bank.what_options}
 
@@ -403,8 +430,13 @@ class CallBrain:
             st.scenario = detect_scenario(self.rules, text) or "undecided"
 
         self._update_flags(signals, findings)
+        st.max_stage = max(st.max_stage, STAGES.index(decision.stage))          # tracked for the gate's scam score
+        st.signals_seen |= set(signals.names)
+        st.stage_words |= {h.rsplit(" +", 1)[0] for stage in ("S1", "S4") for h in scored.hits[stage]}
         plan = self._plan(decision, signals, findings, text)
-        plan = self.gate(plan, st)
+        plan = self.gate(plan, st, GateContext(text, findings, signals.names, st.turn))
+        if plan.end_call or plan.tactic == "goodbye_wrap":      # set AFTER the gate, so the gate sees the goodbye turn itself
+            st.ended = True
 
         st.stage = decision.stage
         st.prev_text = text
@@ -471,8 +503,6 @@ class CallBrain:
             st.readbacks_by_kind[kind] = st.readbacks_by_kind.get(kind, 0) + 1
         if choice.tactic == "ask_detail_slow" and choice.what:
             st.asked[choice.what.key] = st.asked.get(choice.what.key, 0) + 1
-        if choice.tactic == "goodbye_wrap":
-            st.ended = True
 
     def _have(self, kind: str) -> bool:
         return bool(self.state.intel.get(kind))

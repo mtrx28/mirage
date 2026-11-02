@@ -1,0 +1,7 @@
+{
+  "_about": "Word lists the safety gate reads from the caller's line. A STARTER list: the owner should review and extend it. Lists for AI questions and emergencies are in stage_rules.json under 'signals' (the FSM reads them). Matching is on whole words and phrases, never on parts of words. Arrest and legal threats are scam content, not abuse, and are not listed here.",
+  "ask_cues": ["ho kya", "hain kya", "hai kya", "ho ya", "hain ya", "है क्या", "हो क्या"],
+  "second_person": ["aap", "aapko", "aapka", "aapki", "aapke", "apko", "tum", "tumhe", "tumko", "tumhara", "tu", "you", "your", "this", "yeh", "ye", "ये", "यह", "आप", "आपको", "तुम", "तुम्हें", "तू"],
+  "abuse": ["bewakoof", "pagal", "gadha", "ullu", "kutta", "kamina", "harami", "saala", "nalayak", "idiot", "stupid", "bastard", "shut up", "chup raho", "chup kar", "बेवकूफ", "पागल", "गधा", "कमीना", "हरामी"],
+  "violent_threats": ["maar dunga", "maar dalunga", "maar daalunga", "jaan se maar", "tod dunga", "dekh lunga tujhe", "kill you", "hurt you", "i will find you", "मार दूंगा", "जान से मार"]
+}

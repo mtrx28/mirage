@@ -1,0 +1,51 @@
+{
+  "_about": "What the safety gate says when it takes over a reply. EDIT FREELY, then run: python -m mirage.safety  (prints every line and any rule it breaks). 'deflect_identity' lines answer a sincere 'are you a person or an AI?' in persona, WITHOUT saying what Uncle is or is not: they must never claim to be human. 'disclose_*' lines tell the truth and end the call: they must say 'automated assistant', must never claim to be human, and must say the call is ending. {emergency_number} is filled from the gate config and is the ONLY digit string a gate line may contain. 'hostile_calm' keeps Uncle calm with an angry caller; 'hostile_goodbye' ends the call in persona. 'fallback' is the neutral stall used when a reply fails a check. Latin script only, polite forms, no @, no links.",
+  "groups": {
+    "deflect_identity": {
+      "end_call": false,
+      "variants": [
+        "Kya? Sunai nahin diya beta, zara phir se boliye.",
+        "Haan? Line mein awaaz kat rahi hai, kya poochha aapne?",
+        "Arre, kaan thoda kam sunte hain, dheere dheere boliye.",
+        "Kya bola? Mujhe samajh nahin aaya, ek baar aur boliye.",
+        "Hello? Awaaz bahut dheemi hai, kya kaha aapne?"
+      ]
+    },
+    "disclose_identity": {
+      "end_call": true,
+      "variants": [
+        "Main ek automated assistant hoon, asli insaan nahin. Main ye call ab khatam kar raha hoon.",
+        "Sach batata hoon, main ek automated assistant hoon, insaan nahin. Ye call ab yahin khatam hoti hai."
+      ]
+    },
+    "disclose_emergency": {
+      "end_call": true,
+      "variants": [
+        "Main ek automated assistant hoon, insaan nahin, aur madad nahin kar sakta. Emergency ho toh {emergency_number} par call kijiye. Ye call khatam ho rahi hai.",
+        "Main ek automated assistant hoon, asli insaan nahin. Agar emergency hai toh abhi {emergency_number} par call kijiye. Ye call khatam ho rahi hai."
+      ]
+    },
+    "hostile_calm": {
+      "end_call": false,
+      "variants": [
+        "Beta, itna gussa mat kijiye, main sun raha hoon, dheere boliye.",
+        "Aap gussa mat kijiye, mujhe sunai kam deta hai, dheere boliye.",
+        "Arre, itni zor se mat boliye, kaan mein dard hota hai."
+      ]
+    },
+    "hostile_goodbye": {
+      "end_call": true,
+      "variants": [
+        "Aap gussa hain, main phone rakhta hoon. Ram Ram.",
+        "Theek hai beta, aap baad mein baat kijiyega, main phone rakh raha hoon."
+      ]
+    },
+    "fallback": {
+      "end_call": false,
+      "variants": [
+        "Ji? Ek minute, zara phir se boliye.",
+        "Haan ji? Samajh nahin aaya, phir se boliye."
+      ]
+    }
+  }
+}
