@@ -10,3 +10,29 @@
 #   S4 pressure for speed (hurry, install the app, send the OTP)    S5 giving up or hanging up
 # Lines starting with # are ignored. Hinglish in Latin or Devanagari script, as Prisma would write it.
 # Please write only about the scam types Mirage covers: digital arrest, fake agencies, courier and customs, bank KYC.
+
+S0 | Hello sir, courier office se bol raha hoon, aapka ek parcel aaya hai.
+S0 | Namaste ji, bank ke KYC department se baat kar raha hoon, do minute lagenge.
+S0 | Hello uncle, Mumbai customs se call hai, aapka ek shipment pending dikh raha hai.
+
+S1 | Sir, aapke naam se suspicious parcel pakda gaya hai, police complaint ho sakti hai.
+S1 | Aapka Aadhaar details ek illegal shipment ke saath link hua hai, CBI inquiry chal rahi hai.
+S1 | Dekhiye uncle, aapka bank account verification fail hua hai, account freeze ho sakta hai.
+S1 | Aapke against complaint register hui hai, case number 00001234 hai.
+S1 | Customs wale bol rahe hain ki parcel mein illegal item mila hai, matter serious hai.
+
+S2 | Ek minute sir, line mat kaatiye, main senior officer ko connect karta hoon.
+S2 | Hold kariye uncle, system mein details check kar raha hoon.
+S2 | Arre rukiye zara, doosre department se confirmation lena padega.
+
+S3 | Ab meri baat dhyan se suniye, payment details note kar lijiye.
+S3 | Ye UPI ID likh lijiye, verification ke liye amount transfer karna hai.
+S3 | Account number 0000123456 hai, details confirm kar lijiye.
+S3 | Parcel release karwana hai toh customs fee jama karni padegi.
+
+S4 | Jaldi kariye uncle, mere paas zyada time nahi hai.
+S4 | App open kijiye aur screen par jo instructions aa rahe hain woh follow kijiye.
+S4 | OTP enter kijiye, warna aapka verification cancel ho jayega.
+
+S5 | Arre bhai, aapko samajh nahi aa raha kya? Theek hai, main ab kuch nahi kar sakta.
+S5 | Rehne dijiye uncle, aap cooperate nahi kar rahe. Main phone rakh raha hoon.
