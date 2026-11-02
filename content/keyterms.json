@@ -1,0 +1,12 @@
+{
+  "_note": "Words we ask Prisma to favour (the 'keyterms' header: agencies, apps and scam vocabulary). ASCII only, because the docs say non-ASCII must be JSON-escaped and we have not tested that. At most 200 (the docs' limit). The docs say an invalid list is silently ignored, so there is no error if this does nothing.",
+  "terms": [
+    "CBI", "ED", "NCB", "TRAI", "RBI", "NPCI", "SEBI", "DoT", "FIR", "KYC", "OTP", "UPI", "IFSC", "PAN", "Aadhaar",
+    "Cyber Crime", "Crime Branch", "Mumbai Police", "Delhi Police", "Supreme Court", "High Court", "Customs", "Narcotics",
+    "Money Laundering", "Digital Arrest", "Arrest Warrant", "Case Number", "Reference Number", "Safe Account",
+    "AnyDesk", "TeamViewer", "QuickSupport", "RustDesk", "APK", "Screen Share",
+    "Paytm", "PhonePe", "Google Pay", "BHIM", "Amazon Pay", "WhatsApp", "Telegram", "Skype",
+    "SBI", "HDFC", "ICICI", "Axis", "Kotak", "PNB", "Bank of Baroda", "Canara Bank", "Union Bank",
+    "Account Number", "Account Blocked", "SIM Block", "FedEx", "Courier"
+  ]
+}

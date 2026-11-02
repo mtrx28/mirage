@@ -93,6 +93,58 @@ class GateConfig:
 
 
 @dataclass(frozen=True)
+class VoiceConfig:
+    """The voice path: browser mic to Prisma. Prisma values are the ones we measured; the rest are GUESSES."""
+    # where the server listens. Loopback only: the page can spend credits, so nothing else may reach it.
+    host: str = "127.0.0.1"
+    port: int = 8000
+
+    # Prisma (headers confirmed in the smoke runs; see docs/engineering-log.md)
+    prisma_url: str = "wss://api.vachana.ai/stt/v3/stream"
+    prisma_model: str = "prisma-v3.0"
+    language_code: str = "hi-IN"           # one locale, as decided
+    transcript_format: str = "codemix"
+    sample_rate: int = 8000
+    frame_bytes: int = 1024                # exactly 512 samples of 16-bit audio
+    min_silence_ms: int = 500              # baseline; 300 and a 6 s cap were rejected (they split numbers)
+    vad_threshold: float = 0.7
+    min_speech_ms: int = 200
+    idle_timeout_s: int = 300              # docs: default 60, range 5 to 900
+    use_keyterms: bool = True
+    connect_timeout_s: float = 15.0
+    max_reconnects: int = 1                # docs say nothing about reconnecting; one try, no audio replay (a guess)
+    reconnect_delay_s: float = 1.0
+
+    # pacing: a late browser must never turn into a burst of audio
+    backlog_limit_s: float = 0.5           # older audio beyond this is dropped (guess)
+    resync_after_s: float = 0.1            # if a frame is later than this, restart the clock instead of catching up in a burst (guess)
+    browser_chunk_ms: int = 20             # how often the page posts audio (the worklet's batch size)
+    voiced_rms: float = 0.005              # a frame louder than this counts as speech for the credit estimate (guess)
+
+    # call limits
+    max_call_s: float = 14 * 60.0          # Prisma cuts a stream at 15 minutes; we end before that
+    tick_s: float = 1.0                    # how often the page gets a status update and limits are checked
+
+    # credits (rates measured from a handful of runs; see the log)
+    pool_credits: float = 5000.0
+    hard_stop_fraction: float = 0.8
+    warn_fraction: float = 0.7
+    per_call_cap_credits: float = 40.0     # guess: catches a stuck loop
+    stt_credits_per_min: float = 0.45
+    tts_credits_per_1000_chars: float = 2.7
+    seed_credits_spent: float = 18.37      # the dashboard figure at the time of writing
+    seed_requests: int = 23
+    ledger_path: Path = DATA_DIR / "credits.json"
+    flush_every_s: float = 15.0            # the ledger is written this often during a call
+
+    # evidence and data. Raw audio is OFF unless MIRAGE_SAVE_AUDIO=1 is set.
+    calls_dir: Path = DATA_DIR / "calls"
+    audio_dir: Path = DATA_DIR / "audio"
+    audio_keep_days: int = 7
+    lock_path: Path = DATA_DIR / "server.lock"
+
+
+@dataclass(frozen=True)
 class LLMConfig:
     models: tuple[ModelBudget, ...] = MODELS
 

@@ -410,6 +410,57 @@ README disclosure notes.
 - **Unresolved:** a deflection is an in-persona evasion, not a denial; no legal opinion has been taken on it and disclosure
   rules vary by place (this goes in `docs/safety.md` at the second stop).
 
+## Voice path, stop 1 (microphone to Prisma to live transcript)
+
+Built and tested against an in-process stand-in for Prisma. **Nothing here has run against the real service yet**; the
+manual check is the first real run. No audio rendered, no Gemini.
+
+- **Docs re-read** (docs.gnani.ai/api/STT/stt-websocket.md). What they say, and where it differs from the plan:
+  - `keyterms` (Prisma v3.0): up to **200** words or phrases, JSON array or comma-separated. **Non-ASCII must be
+    JSON-escaped.** An invalid list is **silently ignored**, so a wrong list cannot be seen as an error; we can only
+    see it work by the transcripts. The page states **no per-term length limit and nothing about billing**.
+    `bias_list` is the older name, and `bias_score` is v2.5 only. We send a JSON array of ASCII terms
+    (`content/keyterms.json`, 57 terms, checked by a loader).
+  - **Reconnecting: the docs say nothing about it.** They say header settings are fixed per connection ("changing
+    them requires reconnecting"), a stream ends after **15 minutes** (an `error` message, then close code 1001), the
+    idle timeout is 60 s by default (range 5 to 900; we set 300), and there is a **concurrent-session cap per
+    organisation** (a rejected connection gets an `error` naming the limit). Whether a reconnect starts a new
+    15-minute clock, and what happens to audio sent while reconnecting, is not documented. Policy: one retry, no audio
+    replay, and never a retry after 1001 or 1008.
+  - **Differs from my plan:** the docs list a `speech_start` and a `processing` message ("VAD detected end of speech")
+    and `commit`. I had said Prisma sends no speech-start event; wrong. The smoke runs already contain `speech_start`;
+    `processing` has not been seen in any saved run. Stop 1 only logs them. If `processing` arrives it gives the
+    end-of-speech time for the latency log without our own detector. Barge-in could use `speech_start` later.
+  - Also confirmed: audio frames are exactly 1,024 bytes, real-time pace, bursts "degrade VAD".
+  - Unconfirmed in practice: `keyterms` has never been sent in a real run, and `connected` still reports
+    `sample_rate: 16000` while we send 8000.
+- **Built:** `mirage/audio.py` (resample with soxr, exact frames, a paced sender), `mirage/prisma.py`,
+  `mirage/session.py`, `mirage/server.py`, `mirage/credits.py` (ledger, sync command), `mirage/calllog.py`,
+  the page in `mirage/web/`, `content/keyterms.json`, and `VoiceConfig` in `config.py` (every non-Prisma number is a guess).
+- **Gate required:** `CallSession` and `create_app` raise `GateRequired` without a gate, and `main()` builds a real
+  `Gate()`. Tests: no gate, no session; no gate, no server; `main()` passes a `Gate`; an AST scan fails if any module in
+  the package builds a `CallBrain` without a real `gate=`. Mutation-checked.
+- **Resampler:** the soxr default setting held back about 70 ms of audio at the start and the highest 130 ms; we use
+  "MQ", about 35 ms. A constant start-up delay, not drift.
+- **Credits:** estimated in code. Speech-to-text takes the larger of (seconds a simple loudness check calls speech) and
+  (seconds Prisma reports in transcripts), at 0.45 per minute; this leans high. The ledger is seeded at 18.37
+  credits and 23 requests (the dashboard figure), written every 15 s during a call, and compared against a hard stop
+  at 80% of 5,000 (4,000), a warning at 70%, and a per-call cap of 40 (guess). `python -m mirage.credits sync <figure>`
+  resets it to the dashboard. An unreadable ledger blocks calls until synced.
+- **Bug the tests caught:** a clean close from Prisma (the 15-minute close, code 1001) ends the receive loop without an
+  exception, so the close code was lost and the link would have retried. It now reads the code from the socket.
+- **Access control:** loopback address only, an Origin check on the call WebSocket (another website open in the browser
+  cannot start a call), one call at a time, one server process (an OS file lock).
+- **Not built yet (by design):** brain, gate use on replies, Timbre, playback, half-duplex mute (the Pacer can mute, but
+  nothing sets it), the stage and intel panels, latency timestamps beyond logging `speech_start` and `processing`.
+- **Inbound only, in the voice path:** the page has no number entry and no dialer; the only audio source is this
+  computer's microphone; the only outbound connection is to Gnani's speech API (Prisma now, Timbre later), which is a
+  speech service and not telephony. A test checks the page for outside addresses and phone-call APIs, and the existing
+  scan covers the new files.
+- **Friend session note (for the half-duplex version in stop 3):** wear headphones for Uncle's voice and talk into the
+  laptop microphone. Half-duplex is a limitation: while Uncle speaks, the caller's audio is replaced by silence, so
+  talking over him is lost.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

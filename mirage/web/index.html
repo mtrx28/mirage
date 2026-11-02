@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mirage: Rajesh Uncle</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --text: #1d1d1b; --muted: #6a6a64; --line: #dcdad2;
+    --accent: #1f5f8b; --danger: #a4262c; --banner-bg: #fff1b8; --banner-text: #4a3b00; --ok: #2e7d32;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1f1f1d; --text: #ecebe6; --muted: #a09f97; --line: #35352f;
+      --accent: #6db3e0; --danger: #ef7b80; --banner-bg: #4a3b00; --banner-text: #ffe8a0; --ok: #7fcf84;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+  .banner { background: var(--banner-bg); color: var(--banner-text); text-align: center; font-weight: 700;
+            padding: 10px 16px; letter-spacing: .04em; border-bottom: 2px solid var(--banner-text); }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: 2fr 1fr; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted);
+       text-transform: uppercase; letter-spacing: .06em; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font: inherit; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer;
+           background: var(--accent); color: #fff; font-weight: 600; }
+  button.hangup { background: var(--danger); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  #status { color: var(--muted); }
+  #problem { display: none; margin-top: 12px; padding: 12px; border-radius: 8px; border: 1px solid var(--danger);
+             color: var(--danger); }
+  #transcript { height: 340px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+  #transcript li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  #transcript time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 8px; }
+  .big { font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .muted { color: var(--muted); } .warn { color: var(--danger); font-weight: 600; }
+  .placeholder { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<div class="banner" role="note">STAGED DEMO: synthetic data. Nothing here is a real call, person, number or account.</div>
+<main>
+  <div>
+    <section>
+      <h1>Rajesh Uncle (stop 1: listening only)</h1>
+      <p class="muted">Press Start, allow the microphone, and speak as the caller. Uncle does not answer yet:
+        this stage only shows what the speech service heard. Wear headphones and talk into the laptop microphone.</p>
+      <div class="controls">
+        <button id="start">Start call</button>
+        <button id="hangup" class="hangup" disabled>Hang up</button>
+        <span id="status">Not connected.</span>
+      </div>
+      <div id="problem" role="alert"></div>
+    </section>
+    <section style="margin-top:16px">
+      <h2>Live transcript</h2>
+      <ul id="transcript" aria-live="polite"></ul>
+    </section>
+  </div>
+  <div style="display:grid; gap:16px; align-content:start">
+    <section>
+      <h2>Minutes held</h2>
+      <div class="big" id="held">0:00</div>
+      <div class="muted" id="limit"></div>
+    </section>
+    <section>
+      <h2>Credits (estimate)</h2>
+      <div>This call: <span class="big" id="callCredits">0.00</span></div>
+      <div class="muted">Ledger: <span id="ledger">-</span> of <span id="pool">-</span> (<span id="poolPct">-</span>)</div>
+      <div id="creditWarn" class="warn"></div>
+      <div class="muted" style="margin-top:6px">Estimated from audio and characters sent. The dashboard is the truth.</div>
+    </section>
+    <section>
+      <h2>Stage</h2>
+      <div class="placeholder">Arrives in stop 3, with the brain.</div>
+    </section>
+    <section>
+      <h2>Intel</h2>
+      <div class="placeholder">Arrives in stop 3, with the brain.</div>
+    </section>
+  </div>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
