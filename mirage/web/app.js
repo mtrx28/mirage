@@ -7,9 +7,16 @@ const els = {
   start: $("start"), hangup: $("hangup"), status: $("status"), problem: $("problem"), transcript: $("transcript"),
   held: $("held"), limit: $("limit"), callCredits: $("callCredits"), ledger: $("ledger"), pool: $("pool"),
   poolPct: $("poolPct"), creditWarn: $("creditWarn"),
+  micState: $("micState"), noticeList: $("noticeList"), stageNow: $("stageNow"), stageScenario: $("stageScenario"),
+  stageTimeline: $("stageTimeline"), intelCards: $("intelCards"), latencyBody: $("latencyBody"),
+  checkAudio: $("checkAudio"), audioCheck: $("audioCheck"),
 };
 
 const END_REASONS = {
+  uncle_ended: "Uncle ended the call.",
+  gate_ended: "The safety gate ended the call (nothing safe to say).",
+  tts_failed: "The call was ended because Uncle's voice failed several times in a row.",
+  internal_error: "The call was ended because of an internal error (see the notice and the call's log).",
   hangup: "You hung up.",
   browser_closed: "The page was closed.",
   time_limit: "The call reached its time limit and was ended.",
@@ -22,6 +29,7 @@ const END_REASONS = {
 };
 
 let ctx = null, stream = null, ws = null, node = null, streaming = false, ended = false;
+let callPlayer = null, callTurn = 0, heldSeconds = 0;
 
 function mmss(seconds) {
   const s = Math.max(0, Math.round(seconds));
@@ -56,14 +64,103 @@ function micProblem(err) {
   }
 }
 
-function addTranscript(text, t) {
+function addTranscript(text, t, who) {
   const li = document.createElement("li");
+  if (who === "uncle") li.className = "uncle";
   const time = document.createElement("time");
   time.textContent = mmss(t);
   li.appendChild(time);
-  li.appendChild(document.createTextNode(text));            // text node: nothing from the server is parsed as HTML
+  li.appendChild(document.createTextNode((who === "uncle" ? "Uncle: " : "") + text));   // text node: nothing from the server is parsed as HTML
   els.transcript.appendChild(li);
   els.transcript.scrollTop = els.transcript.scrollHeight;
+}
+
+// ---------------------------------------------------------------- the dashboard: notices, stage, intel, latency
+function addNotice(text) {
+  setStatus(text);
+  const li = document.createElement("li");
+  li.appendChild(document.createTextNode(text));
+  els.noticeList.appendChild(li);
+}
+
+const KIND_LABEL = { phone: "Phone number", account: "Account number", case: "Case number", ambiguous: "Number (not labelled)",
+                     vpa: "UPI ID", ifsc: "IFSC code", letters: "Letters", amount: "Amount" };
+
+function el(tag, className, text) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function renderIntel(findings) {
+  els.intelCards.textContent = "";
+  if (!findings.length) { els.intelCards.appendChild(el("span", "placeholder", "Nothing found yet.")); return; }
+  for (const f of findings) {
+    const card = el("div", "card");
+    card.appendChild(el("div", "kind", KIND_LABEL[f.kind] || f.kind));
+    card.appendChild(el("div", "value", f.value));                               // as heard: never replaced by a guess
+    const badges = el("div");
+    badges.appendChild(el("span", "badge", "confidence: " + f.confidence));
+    badges.appendChild(el("span", f.valid ? "badge" : "badge bad", f.valid ? "valid format" : "not valid: " + f.reason));
+    if (f.needs_confirmation) badges.appendChild(el("span", "badge bad", "needs confirmation"));
+    card.appendChild(badges);
+    card.appendChild(el("div", "quote", "“" + f.quote + "” at " + mmss(f.t)));
+    els.intelCards.appendChild(card);
+  }
+}
+
+function renderStage(msg) {
+  els.stageNow.textContent = msg.stage;
+  els.stageScenario.textContent = "scenario: " + msg.scenario + (msg.signals.length ? "; signals: " + msg.signals.join(", ") : "");
+  els.stageTimeline.textContent = "";
+  for (const s of msg.stage_timeline) els.stageTimeline.appendChild(el("li", "", s.from + " → " + s.to + " at " + mmss(s.t)));
+}
+
+const latencyCells = {};                                                      // turn number -> its table cells
+
+function addTurnRow(msg) {
+  const tr = el("tr");
+  const cells = {
+    n: el("td", "", String(msg.turn)), heard: el("td", "", msg.heard.length > 48 ? msg.heard.slice(0, 48) + "…" : msg.heard),
+    wait: el("td", "", msg.wait.wait_s.toFixed(2)), brain: el("td", "", (msg.timing.brain_ms + msg.timing.gate_ms).toFixed(0)),
+    tts: el("td", "", "-"), heardToAudible: el("td", "", "-"),
+    notes: el("td", "", [msg.tactic, msg.gate_action ? "gate: " + msg.gate_action : "", msg.wait.digit_mode ? "digit mode" : "",
+                         msg.wait.hold_extra_s > 0.05 ? "held " + msg.wait.hold_extra_s.toFixed(1) + " s" : ""].filter(Boolean).join("; ")),
+  };
+  for (const c of Object.values(cells)) tr.appendChild(c);
+  els.latencyBody.appendChild(tr);
+  latencyCells[msg.turn] = cells;
+}
+
+function updateTurnLatency(msg) {
+  const cells = latencyCells[msg.turn];
+  if (!cells) return;
+  cells.tts.textContent = msg.cached ? "cached" : (msg.tts_first_byte_ms === null ? "-" : String(msg.tts_first_byte_ms));
+  cells.heardToAudible.textContent = msg.arrival_to_audible_s === null ? "-" : msg.arrival_to_audible_s.toFixed(2);
+}
+
+function showMicState(muted) {
+  els.micState.style.display = "block";
+  els.micState.className = muted ? "muted" : "";
+  els.micState.textContent = muted ? "Uncle is speaking. Stay quiet: anything you say now is lost."
+                                   : "Your turn: the microphone is live.";
+}
+
+function resetDashboard() {
+  els.transcript.textContent = "";
+  els.noticeList.textContent = "";
+  els.latencyBody.textContent = "";
+  els.stageNow.textContent = "-";
+  els.stageScenario.textContent = "";
+  els.stageTimeline.textContent = "";
+  els.micState.style.display = "none";
+  renderIntel([]);
+  for (const k of Object.keys(latencyCells)) delete latencyCells[k];
+}
+
+function sendToServer(message) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
 function showCredits(call, ledger, pool, fraction, warning) {
@@ -83,6 +180,9 @@ function cleanup() {
   if (ctx) { ctx.close().catch(() => {}); ctx = null; }
   els.start.disabled = false;
   els.hangup.disabled = true;
+  els.checkAudio.disabled = false;
+  els.micState.style.display = "none";
+  callPlayer = null;
   speakEls.button.disabled = speaking;                        // the voice test is available again once the call is over
 }
 
@@ -97,11 +197,43 @@ function onServerMessage(msg) {
       addTranscript(msg.text, msg.t);
       break;
     case "tick":
+      heldSeconds = msg.held_s;
       els.held.textContent = mmss(msg.held_s);
       showCredits(msg.call_credits, msg.ledger_spent, msg.pool, msg.pool_fraction, msg.warning);
       break;
     case "notice":
-      setStatus(msg.message);
+      addNotice(msg.message);
+      break;
+    case "turn":
+      callTurn = msg.turn;
+      renderStage(msg);
+      renderIntel(msg.intel);
+      addTurnRow(msg);
+      break;
+    case "latency":
+      updateTurnLatency(msg);
+      break;
+    case "uncle_speech_start": {
+      addTranscript(msg.text, heldSeconds, "uncle");
+      if (ctx && ctx.state !== "running") {                    // sound would be blocked: say so plainly, and tell the server
+        const warning = "The browser is not letting this page play sound (audio state: " + ctx.state + "). Click the page and press Start again.";
+        addNotice(warning);
+        sendToServer({ type: "page_warning", code: "audio_" + ctx.state, message: warning });
+        ctx.resume();
+      }
+      const turn = msg.turn;
+      callPlayer = makePlayer(ctx, msg.sample_rate, (info) => {
+        sendToServer({ type: "playback_done", turn, underruns: info.underruns, audio_state: ctx ? ctx.state : "closed" });
+      }, () => {
+        sendToServer({ type: "playing", turn, output_latency_ms: ctx ? Math.round(((ctx.outputLatency || ctx.baseLatency || 0)) * 1000) : null });
+      });
+      break;
+    }
+    case "uncle_speech_end":
+      if (callPlayer) callPlayer.end();
+      break;
+    case "mic":
+      showMicState(msg.muted);
       break;
     case "error":
       showProblem(msg.message);
@@ -132,8 +264,10 @@ async function loadStatus() {
 
 async function startCall() {
   showProblem("");
-  els.transcript.textContent = "";
+  resetDashboard();
+  callPlayer = null;
   els.start.disabled = true;
+  els.checkAudio.disabled = true;
   speakEls.button.disabled = true;                            // no voice test during a call
   ended = false;
   setStatus("Asking for the microphone...");
@@ -157,7 +291,10 @@ async function startCall() {
   ws = new WebSocket("ws://" + location.host + "/ws/call");
   ws.binaryType = "arraybuffer";
   ws.onopen = () => ws.send(JSON.stringify({ type: "start", sample_rate: ctx.sampleRate }));
-  ws.onmessage = (event) => onServerMessage(JSON.parse(event.data));
+  ws.onmessage = (event) => {
+    if (typeof event.data === "string") onServerMessage(JSON.parse(event.data));
+    else if (callPlayer) callPlayer.push(event.data);                // Uncle's voice
+  };
   ws.onerror = () => { if (!ended) showProblem("Could not talk to the local server. Is it still running?"); };
   ws.onclose = () => {
     if (!ended && ctx) { setStatus("The connection to the server closed."); cleanup(); }
@@ -196,7 +333,7 @@ const speakEls = { button: $("speak"), status: $("speakStatus"), line: $("speakL
 let speakWs = null, speakCtx = null, speakPlayer = null, speaking = false;
 
 // Plays raw 16-bit mono audio as it arrives: each piece is scheduled right after the previous one.
-function makePlayer(ctx, rate, onDone) {
+function makePlayer(ctx, rate, onDone, onStart) {
   const lead = 0.12;                         // a small head start so the first piece is not cut off
   let next = 0, carry = null, open = 0, ended = false, underruns = 0, finished = false;
   function check() {
@@ -218,9 +355,11 @@ function makePlayer(ctx, rate, onDone) {
     source.buffer = audio;
     source.connect(ctx.destination);
     const now = ctx.currentTime;
-    if (next === 0) next = now + lead;
+    const first = next === 0;
+    if (first) next = now + lead;
     else if (next < now) { underruns++; next = now + 0.03; }       // the audio arrived late: there will be a gap
     source.start(next);
+    if (first && onStart) setTimeout(onStart, Math.max(0, (next - now) * 1000));   // "playing" is reported when the first sound starts
     next += audio.duration;
     open++;
     source.onended = () => { open--; check(); };
@@ -290,3 +429,68 @@ els.start.addEventListener("click", startCall);
 els.hangup.addEventListener("click", hangUp);
 window.addEventListener("beforeunload", () => { if (ws) ws.close(); });
 loadStatus();
+
+// ---------------------------------------------------------------- "Check audio": free, before you speak to Uncle
+// Plays a short quiet tone while the microphone is open, and counts how many microphone chunks kept arriving during it.
+// This is the same thing a call does when Uncle speaks (capture and playback at once), without any server or any cost.
+async function checkAudio() {
+  if (ctx || speaking) return;
+  const out = els.audioCheck;
+  const lines = [];
+  const show = () => { out.textContent = ""; for (const l of lines) out.appendChild(el("div", l.bad ? "warn" : "", l.text)); };
+  const say = (text, bad) => { lines.push({ text, bad: !!bad }); show(); };
+  els.checkAudio.disabled = true;
+  els.start.disabled = true;
+  say("Checking... stay quiet for a few seconds, and keep your headphones on.");
+  let c = null, s = null, n = null;
+  try {
+    c = new AudioContext();
+    await c.resume();
+    s = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    await c.audioWorklet.addModule("/static/capture-worklet.js");
+    const phases = { quiet: { chunks: 0, sumsq: 0, samples: 0 }, tone: { chunks: 0, sumsq: 0, samples: 0 } };
+    let phase = "quiet";
+    n = new AudioWorkletNode(c, "capture-processor", { processorOptions: { chunkMs: 20 } });
+    n.port.onmessage = (event) => {
+      const p = phases[phase], data = new Int16Array(event.data);
+      p.chunks++;
+      for (let i = 0; i < data.length; i++) { const v = data[i] / 32768; p.sumsq += v * v; }
+      p.samples += data.length;
+    };
+    const mute = c.createGain();
+    mute.gain.value = 0;
+    c.createMediaStreamSource(s).connect(n);
+    n.connect(mute);
+    mute.connect(c.destination);
+    await new Promise((r) => setTimeout(r, 1000));                    // 1 s of listening only
+    phase = "tone";
+    const osc = c.createOscillator(), gain = c.createGain();
+    osc.frequency.value = 440;
+    gain.gain.value = 0.08;
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start();
+    await new Promise((r) => setTimeout(r, 1500));                    // 1.5 s of tone while still listening
+    osc.stop();
+    const level = (p) => (p.samples ? 20 * Math.log10(Math.sqrt(p.sumsq / p.samples) + 1e-9) : -120);
+    const expectedQuiet = 50, expectedTone = 75;                       // 20 ms chunks: 50 per second
+    say("Audio output state: " + c.state + (c.state === "running" ? " (ok)" : " (not ok: the browser is blocking sound)"), c.state !== "running");
+    say("Sample rate " + c.sampleRate + " Hz; output latency about " + Math.round((c.outputLatency || c.baseLatency || 0) * 1000) + " ms.");
+    say("Microphone chunks while listening only: " + phases.quiet.chunks + " (expected about " + expectedQuiet + ").", phases.quiet.chunks < expectedQuiet * 0.6);
+    const during = phases.tone.chunks >= expectedTone * 0.6;
+    say("Microphone chunks while the tone played: " + phases.tone.chunks + " (expected about " + expectedTone + "). " +
+        (during ? "Capturing and playing at the same time works." : "FAILED: the microphone stopped arriving while sound played. Uncle's calls will not work properly in this browser."), !during);
+    say("Microphone level in the quiet second: " + level(phases.quiet).toFixed(0) + " dBFS" +
+        (level(phases.quiet) < -75 ? " (very low or silent: check the microphone)" : " (ok)") + ". With the tone: " + level(phases.tone).toFixed(0) + " dBFS.", level(phases.quiet) < -75);
+    say("Did you hear a short soft tone in your headphones? If not, sound output is not working even though the page thinks it is.");
+  } catch (err) {
+    say(micProblem(err), true);
+  } finally {
+    if (n) { try { n.port.onmessage = null; n.disconnect(); } catch (e) {} }
+    if (s) s.getTracks().forEach((t) => t.stop());
+    if (c) c.close().catch(() => {});
+    els.checkAudio.disabled = false;
+    els.start.disabled = false;
+  }
+}
+els.checkAudio.addEventListener("click", checkAudio);

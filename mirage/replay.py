@@ -40,8 +40,8 @@ def load_call(path: Path) -> dict:
                             for r in transcripts]}
 
 
-def replay(call: dict, *, normal_wait_s: float = 0.0, ceiling_s: float | None = None, drop_last: int = 0,
-           synthetic: bool = True, seed: int = 0) -> ReplayResult:
+def replay(call: dict, *, normal_wait_s: float | None = None, ceiling_s: float | None = None, total_cap_s: float | None = None,
+           drop_last: int = 0, synthetic: bool = True, seed: int = 0) -> ReplayResult:
     transcripts = list(call["transcripts"])
     starts = list(call["speech_starts"])
     if drop_last:                                   # pretend the caller did not say the last N things
@@ -50,9 +50,9 @@ def replay(call: dict, *, normal_wait_s: float = 0.0, ceiling_s: float | None = 
         transcripts = [r for r in transcripts if r["utterance_id"] not in gone]
         starts = [s for s in starts if s["utterance_id"] not in gone]
 
-    cfg = FSMConfig(synthetic_mode=synthetic, normal_wait_s=normal_wait_s)
+    cfg = FSMConfig(synthetic_mode=synthetic) if normal_wait_s is None else FSMConfig(synthetic_mode=synthetic, normal_wait_s=normal_wait_s)
     brain = CallBrain(config=cfg, gate=Gate(digit_style=cfg.digit_style, seed=seed), seed=seed)
-    sched = TurnScheduler(brain, ceiling_s)
+    sched = TurnScheduler(brain, ceiling_s, total_cap_s)
 
     # Prisma's events in the order they arrived. At the same instant a transcript counts as arriving BEFORE a
     # speech_start: the pessimistic order (the scheduler cannot know about a start that has not been delivered yet).
@@ -103,12 +103,15 @@ def main(argv: list[str] | None = None) -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(description="Replay a saved call through the brain (offline).")
     p.add_argument("call", type=Path, help="a data/calls/<id> folder or a fixture .json")
-    p.add_argument("--normal-wait", type=float, default=0.0, help="the brain's normal wait after a transcript, seconds")
+    p.add_argument("--normal-wait", type=float, default=None, help="the brain's normal wait after a transcript, seconds (default: the config value)")
     p.add_argument("--ceiling", type=float, default=None, help="hold ceiling in seconds (default: the config value)")
+    p.add_argument("--total-cap", type=float, default=None, help="total hold cap in seconds (default: the config value)")
     p.add_argument("--drop-last", type=int, default=0, help="leave out the last N things the caller said")
     args = p.parse_args(argv)
-    result = replay(load_call(args.call), normal_wait_s=args.normal_wait, ceiling_s=args.ceiling, drop_last=args.drop_last)
-    show(result, f"{args.call.name} (normal wait {args.normal_wait:g}s, ceiling {result.scheduler.ceiling:g}s, dropped last {args.drop_last})")
+    result = replay(load_call(args.call), normal_wait_s=args.normal_wait, ceiling_s=args.ceiling, total_cap_s=args.total_cap,
+                    drop_last=args.drop_last)
+    show(result, f"{args.call.name} (normal wait {result.brain.cfg.normal_wait_s:g}s, ceiling {result.scheduler.ceiling:g}s, "
+                 f"dropped last {args.drop_last})")
 
 
 if __name__ == "__main__":

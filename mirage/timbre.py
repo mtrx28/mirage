@@ -270,8 +270,8 @@ class AudioCache:
 
 # --------------------------------------------------------------------------- one at a time
 class _Waiter:
-    def __init__(self, text: str, on_chunk: OnChunk) -> None:
-        self.text, self.on_chunk = text, on_chunk
+    def __init__(self, text: str, on_chunk: OnChunk, past_limit: bool) -> None:
+        self.text, self.on_chunk, self.past_limit = text, on_chunk, past_limit
         self.future: asyncio.Future = asyncio.get_running_loop().create_future()
 
 
@@ -282,7 +282,7 @@ class SpeechQueue:
     def __init__(self, client: TimbreClient, cfg: VoiceConfig, ledger: Ledger, *, cache: AudioCache | None = None,
                  on_charge: Callable[[int], None] | None = None) -> None:
         self.client, self.cfg, self.ledger = client, cfg, ledger
-        self.cache = cache or AudioCache(cfg)
+        self.cache = cache if cache is not None else AudioCache(cfg)      # NOT "cache or ...": an empty cache has length 0 and counts as false
         self._on_charge = on_charge or self._charge_ledger
         self._waiting: _Waiter | None = None
         self._worker: asyncio.Task | None = None
@@ -293,8 +293,10 @@ class SpeechQueue:
     def _charge_ledger(self, chars: int) -> None:
         self.ledger.add(chars / 1000.0 * self.cfg.tts_credits_per_1000_chars, requests=1, note="text to speech")
 
-    async def say(self, text: str, on_chunk: OnChunk) -> Synthesis | None:
-        waiter = _Waiter(text, on_chunk)
+    async def say(self, text: str, on_chunk: OnChunk, *, past_limit: bool = False) -> Synthesis | None:
+        """`past_limit` lets ONE line through at the credit hard stop (the goodbye). It never lets one through when the
+        whole pool is spent."""
+        waiter = _Waiter(text, on_chunk, past_limit)
         if self._waiting is not None and not self._waiting.future.done():
             self._waiting.future.set_result(None)
             self.superseded += 1
@@ -307,14 +309,14 @@ class SpeechQueue:
         while self._waiting is not None:
             waiter, self._waiting = self._waiting, None
             try:
-                waiter.future.set_result(await self._speak(waiter.text, waiter.on_chunk))
+                waiter.future.set_result(await self._speak(waiter.text, waiter.on_chunk, waiter.past_limit))
             except BaseException as e:               # includes cancellation: the waiter must not hang
                 if not waiter.future.done():
                     waiter.future.set_exception(e)
                 if isinstance(e, asyncio.CancelledError):
                     raise
 
-    async def _speak(self, text: str, on_chunk: OnChunk) -> Synthesis:
+    async def _speak(self, text: str, on_chunk: OnChunk, past_limit: bool = False) -> Synthesis:
         t0 = time.monotonic()
         key = AudioCache.key(self.cfg, text)
         pcm = self.cache.get(key)
@@ -322,7 +324,9 @@ class SpeechQueue:
             for i in range(0, len(pcm), 9600):       # about 0.2 s per piece at 24 kHz, the way a live line arrives
                 await on_chunk(pcm[i:i + 9600])
             return Synthesis(pcm, self.cfg.tts_sample_rate, 0, True, None, time.monotonic() - t0, 0)
-        if self.ledger.blocked():
+        if self.ledger.spent >= self.cfg.pool_credits:
+            raise CreditLimitReached("The whole credit pool is spent: nothing more will be spoken.")
+        if self.ledger.blocked() and not past_limit:
             raise CreditLimitReached("Credit hard stop: no more speech will be requested. Check the dashboard and run "
                                      "'python -m mirage.credits sync <figure>'.")
         charged = {"done": False}
@@ -350,11 +354,11 @@ class Speaker:
         self.gate = require_gate(gate)
         self.queue = queue
 
-    async def say(self, plan: ReplyPlan, on_chunk: OnChunk) -> Synthesis | None:
+    async def say(self, plan: ReplyPlan, on_chunk: OnChunk, *, past_limit: bool = False) -> Synthesis | None:
         if not plan.gated:
             raise UngatedPlan("This reply did not come through the safety gate, so it will not be spoken.")
         if plan.needs_gate:
             raise UngatedPlan("The gate left this reply unresolved (needs_gate), so it will not be spoken.")
         if not plan.text.strip():
             raise UngatedPlan("The gate produced no text for this reply, so nothing is spoken.")
-        return await self.queue.say(plan.text, on_chunk)
+        return await self.queue.say(plan.text, on_chunk, past_limit=past_limit)

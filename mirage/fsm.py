@@ -452,6 +452,26 @@ class CallBrain:
         st.awaiting_digits = plan.awaiting_digits
         return Turn(decision, st.scenario, signals.names, findings, plan, self.reply_wait_s())
 
+    def in_digit_mode(self) -> bool:
+        """True while the caller may be in the middle of a number (the longer wait applies)."""
+        return self.reply_wait_s() >= self.cfg.digit_wait_s
+
+    def force_goodbye(self) -> ReplyPlan:
+        """Uncle's in-persona goodbye line, for a time or credit limit. It is worded and checked like any other reply:
+        it goes through the safety gate before anyone can speak it."""
+        st = self.state
+        choice = _Choice("goodbye_wrap", "forced: the call reached a time or credit limit")
+        line, text, sources, _ = self._render(choice, st.stage)
+        self._after_choice(choice)
+        plan = ReplyPlan(text, "goodbye_wrap", st.stage, "template", line.id, False, None, tuple(sources), None, choice.why, False)
+        plan = self.gate(plan, st, GateContext("", (), (), st.turn))
+        st.ended = True
+        st.turn += 1
+        if plan.line_id:
+            st.recent.append(plan.line_id)
+            st.last_used[plan.line_id] = st.turn
+        return plan
+
     # ------------------------------------------------------------------ pieces of a turn
 
     def _record_intel(self, findings: tuple[Finding, ...]) -> None:

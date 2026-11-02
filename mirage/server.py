@@ -1,6 +1,6 @@
 """The web server: serves the page and carries one call at a time over a WebSocket.
 
-    python -m mirage.server --max-minutes 3 --keyterms off
+    python -m mirage.server --max-minutes 3
 
 Safety by construction:
   - it refuses to start without the safety gate (GateRequired), even though stop 1 never speaks;
@@ -32,7 +32,8 @@ from mirage.credits import CreditLimitReached, Ledger
 from mirage.prisma import PrismaError, PrismaLink, load_keyterms
 from mirage.gaterequired import GateRequired, require_gate  # noqa: F401  (GateRequired is imported from here by the tests)
 from mirage.session import CallSession
-from mirage.timbre import SpeechQueue, Speaker, TimbreClient, TimbreError, UngatedPlan
+from mirage.live import LiveCall
+from mirage.timbre import AudioCache, SpeechQueue, Speaker, TimbreClient, TimbreError, UngatedPlan
 from mirage.voicetest import fixed_line_plan
 
 log = logging.getLogger("mirage.server")
@@ -97,7 +98,8 @@ def allowed_origins(cfg: VoiceConfig) -> set[str]:
 
 def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger | None = None,
                key_loader=load_key_from_env, keyterms: list[str] | None = None,
-               link_factory=PrismaLink, max_call_s: float | None = None, tts_client_factory=TimbreClient) -> FastAPI:
+               link_factory=PrismaLink, max_call_s: float | None = None, tts_client_factory=TimbreClient,
+               live: bool = False) -> FastAPI:
     require_gate(gate)                                      # no gate, no server
     cfg = cfg or VoiceConfig()
     ledger = ledger or Ledger(cfg)
@@ -111,6 +113,12 @@ def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger |
     app.state.active = False
     app.state.speaker = None            # built on first use, then kept so its in-memory audio cache survives between presses
     app.state.tts_client = None
+    app.state.audio_cache = AudioCache(cfg)      # shared by the voice test and every call: a repeated line is instant and free
+
+    def ensure_tts_client(key: str):
+        if app.state.tts_client is None:
+            app.state.tts_client = tts_client_factory(cfg, key)
+        return app.state.tts_client
     app.state.ledger = ledger
     origins = allowed_origins(cfg)
 
@@ -174,8 +182,16 @@ def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger |
                         await notify({"type": "error", "message": "GNANI_API_KEY is missing. Put it in the .env file "
                                       "(see .env.example) and restart the server."})
                         break
-                    session = CallSession(cfg, gate, ledger, notify, key=key, keyterms=keyterms,
-                                          link_factory=link_factory, max_call_s=max_call_s)
+                    async def send_audio(piece: bytes) -> None:
+                        await ws.send_bytes(piece)
+
+                    if live:                                # the full loop: Uncle answers
+                        session = LiveCall(cfg, gate, ledger, notify, key=key, keyterms=keyterms, link_factory=link_factory,
+                                           max_call_s=max_call_s, send_audio=send_audio, tts_client=ensure_tts_client(key),
+                                           cache=app.state.audio_cache)
+                    else:                                   # listening only (stop 1)
+                        session = CallSession(cfg, gate, ledger, notify, key=key, keyterms=keyterms,
+                                              link_factory=link_factory, max_call_s=max_call_s)
                     try:
                         await session.start(int(data.get("sample_rate") or 0))
                     except (PrismaError, CreditLimitReached) as e:
@@ -185,6 +201,8 @@ def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger |
                 elif kind == "hangup":
                     reason = "hangup"
                     break
+                elif session is not None:
+                    await session.on_page_message(data)     # "playing", "playback_done", a page warning
         finally:
             if session is not None:
                 await session.hangup(reason)                # does nothing if the call already ended on its own
@@ -201,8 +219,7 @@ def create_app(gate: object, cfg: VoiceConfig | None = None, *, ledger: Ledger |
             key = key_loader()
             if not key:
                 return None
-            app.state.tts_client = tts_client_factory(cfg, key)
-            app.state.speaker = Speaker(gate, SpeechQueue(app.state.tts_client, cfg, ledger))
+            app.state.speaker = Speaker(gate, SpeechQueue(ensure_tts_client(key), cfg, ledger, cache=app.state.audio_cache))
         return app.state.speaker
 
     def log_speech(record: dict) -> None:
@@ -316,7 +333,7 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Deleted saved audio older than {cfg.audio_keep_days} days: {name}")
         ledger = Ledger(cfg)
         terms = load_keyterms() if cfg.use_keyterms else None
-        app = create_app(Gate(), cfg, ledger=ledger, keyterms=terms, max_call_s=args.max_minutes * 60)
+        app = create_app(Gate(), cfg, ledger=ledger, keyterms=terms, max_call_s=args.max_minutes * 60, live=True)
         print(f"Ledger: {ledger.spent:.2f} credits spent; hard stop at {ledger.limit:.0f}. "
               f"Keyterms: {'on (' + str(len(terms)) + ' terms)' if terms else 'off'}. "
               f"Each call ends after {args.max_minutes:g} minutes.")

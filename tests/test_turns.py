@@ -103,11 +103,40 @@ def test_nothing_is_due_after_the_call_has_ended_and_a_transcript_without_a_star
     assert sched.ready_at() is None
 
 
-def test_the_ceiling_comes_from_the_config_and_is_marked_as_a_guess():
-    assert FSMConfig().hold_ceiling_s == 10.0
+def test_the_hold_settings_come_from_the_config_and_are_marked_as_guesses():
+    cfg = FSMConfig()
+    assert (cfg.normal_wait_s, cfg.hold_ceiling_s, cfg.hold_total_cap_s, cfg.hold_total_cap_digit_s) == (0.3, 15.0, 20.0, 40.0)
     brain = CallBrain(config=FSMConfig(hold_ceiling_s=7.5), seed=0)
     assert TurnScheduler(brain).ceiling == 7.5
-    assert "GUESS" in (Path(__file__).parent.parent / "mirage" / "config.py").read_text(encoding="utf-8").split("hold_ceiling_s")[1][:200]
+    source = (Path(__file__).parent.parent / "mirage" / "config.py").read_text(encoding="utf-8")
+    for name in ("normal_wait_s", "hold_ceiling_s", "hold_total_cap_s", "hold_total_cap_digit_s"):
+        assert "GUESS" in source.split(f"{name}: float")[1][:400]
+
+
+def test_a_chain_of_utterances_is_answered_at_the_total_cap_and_the_next_one_is_a_new_turn():
+    brain, sched = make(ceiling=15.0)
+    sched.speech_start("u0", 0.2)
+    sched.transcript("u0", "namaste ji", 1.0, 1.0)
+    words = ["pehli", "doosri", "teesri"]
+    for i, word in enumerate(words, start=1):             # each utterance starts right after the previous transcript
+        sched.speech_start(f"u{i}", 1.0 + 6.0 * (i - 1) + 0.1)
+        sched.transcript(f"u{i}", f"{word} baat suniye", 1.0 + 6.0 * i, 5.0)
+    sched.speech_start("u4", 19.1)                         # still being spoken at 21 s
+    assert sched.ready_at() == pytest.approx(21.0)         # 1.0 (oldest unanswered) + the 20 s cap, not u4's 15 s ceiling (34.1)
+    turn = sched.respond(21.0)
+    assert turn.plan.text and brain.state.answered == 4
+    assert [e["event"] for e in sched.log] == ["hold_total_cap"] and sched.log[0]["unanswered_for_s"] == pytest.approx(20.0)
+    sched.transcript("u4", "chauthi baat suniye", 25.0, 6.0)
+    assert any(e["event"] == "late_transcript" for e in sched.log) and len(sched.pending()) == 1      # heard as the next turn
+
+
+def test_while_the_caller_is_mid_number_the_longer_total_cap_applies():
+    brain, sched = make(ceiling=15.0)
+    sched.transcript("u1", "phone number hai zero", 1.0, 2.0)               # ends in a digit: digit mode
+    sched.speech_start("u2", 1.2)
+    assert sched.total_cap_s() == 40.0 and sched.ready_at() == pytest.approx(16.2)      # the ceiling (1.2 + 15), well before the 41 s cap
+    sched.speech_start("u3", 30.0)                                          # (a second open utterance, much later)
+    assert sched.ready_at() == pytest.approx(41.0)                          # capped at 1.0 + 40, not at 30 + 15
 
 
 # ------------------------------------------------------------------ the two real calls
@@ -141,6 +170,19 @@ def test_without_the_hold_the_old_failure_comes_back():
     assert any(abs(t["at"] - 19.39) < 0.1 for t in result.turns)
 
 
+def test_with_the_chosen_defaults_the_whole_monologue_and_dictation_is_answered_once_and_correctly():
+    for call, at in ((OFF, 33.6), (ON, 34.13)):
+        result = replay(call)                                               # config defaults: 0.3 s wait, 15 s ceiling, 20 s / 40 s caps
+        assert len(result.turns) == 1 and result.turns[0]["at"] == pytest.approx(at, abs=0.01)
+        assert [f.value for f in result.brain.state.intel["phone"]] == [PHONE] and result.scheduler.log == []
+
+
+def test_a_flat_20_s_cap_would_have_answered_mid_number_which_is_why_digit_mode_gets_a_longer_one():
+    result = replay(OFF, total_cap_s=20.0)                                  # override the digit-mode extension
+    assert result.turns[0]["at"] == pytest.approx(23.05, abs=0.01)         # answered during the dictation
+    assert any(e["event"] == "hold_total_cap" for e in result.scheduler.log)
+
+
 def test_the_ceiling_can_fire_on_genuine_long_speech_which_is_the_known_trade_off():
     """A 13.5 s utterance is real speech in the recorded call. With a 0.3 s normal wait the hold sees it, and a 10 s ceiling
     releases it mid-speech; a 15 s ceiling does not."""
@@ -158,7 +200,7 @@ def test_a_stuck_utterance_and_a_noise_blip_inside_a_real_call_do_not_stall_it()
                             {"utterance_id": "n1", "t": 5.5, "text": "", "audio_s": 0.5},                    # a blip
                             {"utterance_id": "u3", "t": 22.0, "text": "suniye suniye", "audio_s": 1.0},       # waits for the stuck one
                             {"utterance_id": "u2", "t": 31.0, "text": "aapka account block ho jayega", "audio_s": 1.5}]}
-    result = replay(call, ceiling_s=10.0)
+    result = replay(call, ceiling_s=10.0, normal_wait_s=0.0)
     assert [round(t["at"], 1) for t in result.turns] == [1.0, 30.0, 31.0]
     assert [e["event"] for e in result.scheduler.log if e["event"] != "empty_transcript_cleared_hold"] == ["hold_ceiling"]
     assert any(e["event"] == "empty_transcript_cleared_hold" for e in result.scheduler.log)

@@ -33,10 +33,12 @@ Notify = Callable[[dict], Awaitable[None]]
 class CallSession:
     def __init__(self, cfg: VoiceConfig, gate: object, ledger: Ledger, notify: Notify, *, key: str,
                  keyterms: list[str] | None = None, link_factory: Callable[..., PrismaLink] = PrismaLink,
-                 call_log: CallLog | None = None, max_call_s: float | None = None) -> None:
+                 call_log: CallLog | None = None, max_call_s: float | None = None,
+                 send_audio: Callable[[bytes], Awaitable[None]] | None = None) -> None:
         self.gate = require_gate(gate)
         self.cfg, self.ledger, self.notify, self._key = cfg, ledger, notify, key
         self.keyterms = keyterms
+        self.send_audio = send_audio                         # audio for the page (Uncle's voice); stop 1 has none
         self._link_factory = link_factory
         self.max_call_s = cfg.max_call_s if max_call_s is None else max_call_s
         self.log = call_log or CallLog(cfg)
@@ -160,6 +162,13 @@ class CallSession:
             self.meter.voiced_s = self.pacer.voiced_frames * frame_s
             self.meter.sent_s = self.pacer.real_frames * frame_s
 
+    # ------------------------------------------------------------------ hooks for the live call
+    def _extra_summary(self) -> dict:
+        return {}
+
+    async def on_page_message(self, data: dict) -> None:
+        """A message from the page other than start and hangup (the live call uses it)."""
+
     # ------------------------------------------------------------------ end
     async def hangup(self, reason: str = "hangup") -> None:
         await self._finish(reason)
@@ -180,7 +189,8 @@ class CallSession:
         self._sync_meter()
         if self.pacer is not None:                           # a call that never streamed audio costs nothing
             self.meter.flush(force=True)
-        summary = {"end_reason": reason, "credits": self.meter.summary(), "transcripts": len(self.transcripts)}
+        summary = {"end_reason": reason, "credits": self.meter.summary(), "transcripts": len(self.transcripts),
+                   **self._extra_summary()}
         if self.pacer is not None:
             p = self.pacer
             summary["audio"] = {"real_frames": p.real_frames, "filler_frames": p.filler_frames,

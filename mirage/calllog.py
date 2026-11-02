@@ -63,6 +63,13 @@ class CallLog:
     def transcript(self, **fields) -> None:
         self._append("transcripts.jsonl", {"t": round(self.now(), 3), **fields})
 
+    def record(self, stream: str, **fields) -> None:
+        """One more line in `<stream>.jsonl` (turns, latency ...), stamped with seconds since the call started."""
+        self._append(f"{stream}.jsonl", {"t": round(self.now(), 3), **fields})
+
+    def write_json(self, name: str, body: object) -> None:
+        (self.dir / name).write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
+
     def audio(self, frame: bytes) -> None:
         if self._audio is not None:
             self._audio.writeframes(frame)

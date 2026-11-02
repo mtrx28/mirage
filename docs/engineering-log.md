@@ -686,6 +686,65 @@ A test switches the hold off (ceiling 0) and shows the old failure coming back, 
    transcript). A normal wait of 0.3 s catches it, at the cost of 0.3 s on every turn. Not changed.
 4. Only two calls, one speaker, one microphone; the numbers are what happened, not rates.
 
+## Voice path, stop 3 (the full loop)
+
+Built and tested against a scripted Prisma, a fake Timbre and a pretend page. **Nothing has run against the real services in
+this configuration yet.** No audio was rendered and no line was pre-rendered.
+
+**Settings chosen by the owner (all in config, all GUESSES):** normal wait 0.3 s (`FSMConfig.normal_wait_s`), hold ceiling 15 s,
+total-hold cap 20 s. **One addition of mine:** a longer cap of 40 s while the caller is mid-number (digit mode), because with a
+flat 20 s the replay of the owner's own call answered at 23.05 s, in the middle of the dictation, and the number was only
+captured from the final repeat. With the extension the same call is answered once, at 33.6 s, with the number whole.
+Also guesses: unmute holdoff 0.3 s, playback fallback margin 2 s, mute grace 1.5 s, goodbye deadline 15 s, 3 failed lines in a row.
+
+- **The loop (`mirage/live.py`, `LiveCall`):** Prisma events go to the turn scheduler; when a reply is due the brain makes it, the
+  gate checks it, `Speaker` sends it to Timbre, and the audio goes to the page over the same WebSocket. Uncle speaks only after the
+  caller's first words. Everything Uncle says passes the gate (the brain is built with it; `Speaker` refuses a plan it did not stamp;
+  a test simulates forgetting the gate and shows nothing is spoken).
+- **Half-duplex, and what happens to an open utterance.** From Uncle's first audio byte until the page says his line finished (plus
+  a 0.3 s holdoff), the pacer sends Prisma silent frames instead of the microphone. The page shows "Uncle is speaking" and "Your turn".
+  An utterance already open when the mute starts: Prisma sees silence, ends it after its 500 ms, and sends a transcript of the part
+  spoken before the mute. Events arriving while Uncle speaks are held and handled when he stops, counted from that moment (so the
+  digit wait runs from the end of his line). **Anything the caller says over Uncle is lost**; the caller must wait for him to finish.
+  This is a known limitation, shown on the page and in `docs/voice.md`. A hold decision needs no clock while Uncle speaks: no reply
+  timer runs until he stops.
+- **Playback finished:** the page reports `playing` (first sound) and `playback_done` (last piece ended, with a count of gaps and the
+  audio state). If `playback_done` never comes, the mute ends after the audio's length plus 0.5 s plus the margin, with a notice
+  and a `playback_done_missing` log entry.
+- **Self-checks that say so plainly instead of failing silently:**
+  - *Capture while playing:* the page has a free **Check audio** button (a quiet tone while it counts microphone chunks). During a
+    call the server also checks that microphone audio kept arriving while Uncle spoke; if it fell below a fifth of what was
+    expected, there is a notice on the page and a `capture_stalled_during_playback` log entry.
+  - *Silence reaching Prisma as silence:* while muted, only zero frames are sent (a test checks every muted frame is all zeros).
+    If Prisma reports NEW speech more than 1.5 s into a mute (a new `speech_start`, or text from an utterance that was not already
+    open), that is logged as `mute_anomaly` with a notice. It cannot tell the cause (the caller talking over him, his voice
+    reaching the microphone, or Prisma mishandling silence), and says so. The first solo check, in silence, is the test.
+  - *Audio blocked:* if the browser's audio state is not running when Uncle starts to speak, the page says so and tells the server.
+- **Latency:** one row per spoken line in `latency.jsonl` and in the page's table: `wait_s` (its own column), `base_wait_s`,
+  `hold_extra_s`, `digit_mode`, `brain_ms`, `gate_ms`, `tts_first_byte_ms`, `tts_total_ms`, the time the first audio was sent,
+  the time the page reported it playing, `arrival_to_audible_s`, and `end_to_audible_est_s`. **End of speech is approximate:** it is the
+  transcript's arrival minus Prisma's reported latency minus 500 ms (Prisma sends no end-of-speech message in practice; the
+  docs' `processing` message has never been seen). Percentiles will be computed only from real runs.
+- **Limits:** at the time limit (14 min, or `--max-minutes`), the credit hard stop or the per-call cap, Uncle says one in-persona
+  goodbye (`force_goodbye`, through the gate), then the call ends. The goodbye may go past the hard stop once; if the whole pool is
+  spent, or the voice is down, or the goodbye cannot finish in 15 s, the call ends silently. Tested for each.
+- **TTS failures (for E5):** when a line cannot be spoken the turn is logged with `spoken: false`, `brain_believes_spoken: true` and the
+  error, and counted in `unspoken_turns` in the summary, so a count of Uncle's replies does not include a line nobody heard. The brain
+  still believes it said it (its used-line memory and tactic counters), which is a known blemish. Three in a row end the call.
+- **Evidence per call:** `turns.jsonl` (what was heard, stage change and reasons, findings with quotes, gate action, Uncle's line,
+  whether spoken, timings, scheduler events), `latency.jsonl`, `findings.json`, `summary.json` (stage timeline, gate log, counts).
+- **Bugs the tests found in my own code:** (1) an empty `AudioCache` has length 0, so `cache or AudioCache()` silently replaced the
+  shared cache with a private one; (2) a log call used a keyword (`kind=`) that clashed with its own parameter; (3) the reply timer
+  could wake a few milliseconds early, so a logged wait could be shorter than the configured one (it now looks again and never
+  replies early).
+- **Tests:** 584 in all (the new ones: `test_live.py`, `test_live_server.py`, additions to `test_turns.py`). Eleven deliberate
+  breakages of the loop were run; ten were caught first time. The eleventh (removing the guard against replying while speaking) was
+  not caught even with both copies of the guard removed, so a test was added (a caller speaking while Uncle's voice is being made),
+  and then it was caught.
+- **Not verified (the solo check settles these):** that this browser captures and plays at once; that Prisma treats zero frames as
+  clean silence; real time to first audio in a call; whether Uncle's lines are chosen sensibly on unseen speech (the stage rules
+  scored 12 of 20 on the friend's held-out lines); behaviour at a reconnect or at 15 minutes; `keyterms` stay off.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

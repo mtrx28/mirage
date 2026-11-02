@@ -315,7 +315,7 @@ def test_a_stall_line_is_not_repeated_while_it_is_recent_and_runs_are_reproducib
 def test_digit_mode_waits_longer_and_the_wait_is_configurable():
     brain = CallBrain()
     run(brain, ["hello"])
-    assert brain.reply_wait_s() == 0.0
+    assert brain.reply_wait_s() == FSMConfig().normal_wait_s == 0.3                                      # the normal wait is a config value (0.3 s, a guess)
     brain.hear("mera number hai chaar saat do nau ek", 20.0, 2.0)          # ends in the middle of a number
     assert brain.reply_wait_s() == 1.8
     brain.respond()

@@ -39,6 +39,20 @@
   .big { font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 600; }
   .muted { color: var(--muted); } .warn { color: var(--danger); font-weight: 600; }
   .placeholder { color: var(--muted); font-style: italic; }
+  #micState { display: none; margin-top: 12px; padding: 12px; border-radius: 8px; font-weight: 700; border: 2px solid var(--ok); color: var(--ok); }
+  #micState.muted { border-color: var(--danger); color: var(--danger); }
+  #transcript li.uncle { color: var(--accent); font-style: italic; }
+  #noticeList { margin: 8px 0 0; padding-left: 20px; color: var(--danger); }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+  .card .kind { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .card .value { font: 600 18px ui-monospace, Consolas, monospace; word-break: break-all; }
+  .card .quote { font-size: 13px; color: var(--muted); }
+  .badge { display: inline-block; font-size: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; margin-right: 4px; }
+  .badge.bad { border-color: var(--danger); color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  #stageNow { font-size: 28px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -46,15 +60,20 @@
 <main>
   <div>
     <section>
-      <h1>Rajesh Uncle (stops 1 and 2: listening, and a voice test)</h1>
-      <p class="muted">Press Start, allow the microphone, and speak as the caller. Uncle does not answer yet:
-        this stage only shows what the speech service heard. Wear headphones and talk into the laptop microphone.</p>
+      <h1>Rajesh Uncle</h1>
+      <p class="muted">Press Start, allow the microphone, and speak as the caller. Uncle answers. Use a good microphone and
+        wear headphones for Uncle's voice. <strong>Wait for Uncle to finish before you speak:</strong> while he talks, the
+        microphone is muted to the speech service, and anything you say over him is lost.</p>
       <div class="controls">
         <button id="start">Start call</button>
         <button id="hangup" class="hangup" disabled>Hang up</button>
+        <button id="checkAudio" title="Free: plays a short tone while listening to your microphone">Check audio (free)</button>
         <span id="status">Not connected.</span>
       </div>
+      <div id="micState" role="status"></div>
       <div id="problem" role="alert"></div>
+      <ul id="noticeList" aria-live="polite"></ul>
+      <div id="audioCheck" class="muted" style="margin-top:8px"></div>
     </section>
     <section style="margin-top:16px">
       <h2>Voice test (stop 2)</h2>
@@ -69,8 +88,17 @@
       <div id="speakProblem" role="alert" class="warn"></div>
     </section>
     <section style="margin-top:16px">
-      <h2>Live transcript</h2>
+      <h2>Conversation</h2>
       <ul id="transcript" aria-live="polite"></ul>
+    </section>
+    <section style="margin-top:16px">
+      <h2>Turns and latency</h2>
+      <table>
+        <thead><tr><th>#</th><th>Caller said</th><th title="the deliberate wait, hold included">Wait s</th><th>Brain+gate ms</th>
+          <th>Timbre first byte ms</th><th title="last transcript arrival to Uncle audible">Heard to audible s</th><th>Notes</th></tr></thead>
+        <tbody id="latencyBody"></tbody>
+      </table>
+      <div class="muted" style="margin-top:6px">Wait is its own column so it can be subtracted when latency is analysed.</div>
     </section>
   </div>
   <div style="display:grid; gap:16px; align-content:start">
@@ -88,11 +116,13 @@
     </section>
     <section>
       <h2>Stage</h2>
-      <div class="placeholder">Arrives in stop 3, with the brain.</div>
+      <div id="stageNow">-</div>
+      <div class="muted" id="stageScenario"></div>
+      <ol id="stageTimeline" class="muted" style="margin:6px 0 0; padding-left:20px"></ol>
     </section>
     <section>
       <h2>Intel</h2>
-      <div class="placeholder">Arrives in stop 3, with the brain.</div>
+      <div id="intelCards"><span class="placeholder">Nothing found yet.</span></div>
     </section>
   </div>
 </main>

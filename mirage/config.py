@@ -51,12 +51,18 @@ SYNTHETIC_UPI_PROVIDERS: frozenset[str] = frozenset({"mirageupi"})
 @dataclass(frozen=True)
 class FSMConfig:
     """Starting values for the call brain. E2 will tune the waits; nothing here is measured yet."""
-    normal_wait_s: float = 0.0       # extra wait after the last transcript before Uncle replies (Prisma already waited ~0.5 s)
+    normal_wait_s: float = 0.3       # GUESS: extra wait after the last transcript before Uncle replies. Prisma already waited ~0.5 s; the
+                                     # 0.3 s lets a following speech_start (0 to 0.2 s later in the recorded calls) arrive so the hold can see it.
+                                     # It is a separate column in the latency table so E2 can subtract it.
     digit_wait_s: float = 1.8        # in digit-dictation mode: wait longer, the caller may be mid-number
     join_window_s: float = 2.5       # transcripts this close together are one dictation (see extract.py)
-    hold_ceiling_s: float = 10.0     # GUESS: a reply is held while Prisma has an utterance open (speech_start, no transcript yet);
+    hold_ceiling_s: float = 15.0     # GUESS: a reply is held while Prisma has an utterance open (speech_start, no transcript yet);
                                      # an utterance still open after this long is treated as stuck and stops blocking replies.
-                                     # Real utterances in the two good calls stayed open up to 13.5 s, so this can fire on genuine speech.
+                                     # Real utterances in the two good calls stayed open up to 13.5 s, so a lower value fires on genuine speech.
+    hold_total_cap_s: float = 20.0   # GUESS: however many utterances chain together, Uncle answers what he has heard once the OLDEST unanswered
+                                     # transcript is this old; the caller's next utterance then becomes the next turn.
+    hold_total_cap_digit_s: float = 40.0   # GUESS: the same cap while the caller is mid-number (digit mode). Without it a 30 s monologue that
+                                     # ends in a slowly read number was answered at 23 s, before the number was finished.
     recent_line_memory: int = 5      # a line is not repeated if it is among the last N lines said
     max_alarm_uses: int = 2
     max_stall_uses: int = 2
@@ -123,6 +129,15 @@ class VoiceConfig:
     resync_after_s: float = 0.1            # if a frame is later than this, restart the clock instead of catching up in a burst (guess)
     browser_chunk_ms: int = 20             # how often the page posts audio (the worklet's batch size)
     voiced_rms: float = 0.005              # a frame louder than this counts as speech for the credit estimate (guess)
+
+    # the live call (stop 3). All GUESSES until measured.
+    synthetic_mode: bool = True            # the staged demo: accept the 00-prefixed phone numbers
+    unmute_holdoff_s: float = 0.3          # after the page says Uncle's line finished playing, wait this long before the mic goes live again
+    playback_margin_s: float = 2.0         # if the page never says "playback done", unmute after the audio's length plus this
+    mute_grace_s: float = 1.5              # Prisma needs a moment to react to the silence: speech reported this soon after the mute started is not an anomaly
+    capture_stall_min_s: float = 1.5       # only check that the microphone kept arriving during an Uncle line that lasted at least this long
+    goodbye_deadline_s: float = 15.0       # the whole goodbye (synthesis and playback) at a time or credit limit
+    max_tts_failures: int = 3              # this many failed lines in a row end the call
 
     # call limits
     max_call_s: float = 14 * 60.0          # Prisma cuts a stream at 15 minutes; we end before that
