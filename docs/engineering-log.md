@@ -461,6 +461,86 @@ manual check is the first real run. No audio rendered, no Gemini.
   laptop microphone. Half-duplex is a limitation: while Uncle speaks, the caller's audio is replaced by silence, so
   talking over him is lost.
 
+## Voice path, stop 1: the first two real runs (2026-11-02)
+
+Both runs are in `data/calls/` (gitignored). Findings from the local files only; no network, no audio.
+
+**These two runs cannot be compared for accuracy or cost.** They contain different amounts of speech: run 1 had 19
+Prisma segments (26.8 s of segment audio with text) and run 2 had 8 (16.9 s), and in run 2 Prisma's VAD reported no
+speech at all for the first 30.4 s. Each keyterm outcome below is one sample on different speech. Nothing here is
+evidence that keyterms help or hurt.
+
+| | Run 1 (keyterms off) | Run 2 (keyterms on, 57 terms) |
+|---|---|---|
+| Call length | 59.9 s | 56.9 s |
+| `speech_start` events / transcripts | 19 / 19 | 8 / 8 |
+| Transcripts with text / empty | 13 / 6 | 7 / 1 |
+| Frames dropped / resyncs / lost to Prisma | 0 / 0 / 0 | 0 / 0 / 0 |
+| Filler (silent) frames | 3 (0.19 s) | 3 (0.19 s) |
+| Real microphone frames sent | 912 (58.4 s) | 866 (55.4 s) |
+| Speech seconds, our loudness check | 12.4 | 8.3 |
+| Speech seconds, Prisma's `audio_duration_ms` sum (padding and empty segments included) | 37.2 | 18.4 |
+| `processing` or `error` messages | 0 / 0 | 0 / 0 |
+| First `speech_start` | 4.9 s | 30.8 s |
+| Ledger estimate for the call | 0.279 | 0.138 |
+
+The ledger figures are **our estimate** (Prisma-reported seconds at 0.45 per minute), not the dashboard. The empty
+segments are inside that count; whether Gnani bills them is unknown. The dashboard deltas for these runs have not been
+recorded.
+
+**What the events prove**
+
+- Prisma sent exactly one `transcript` per `speech_start`, in both runs (utterance ids match one to one). The page
+  shows every transcript that has text and hides the empty ones, so **the page did not lose anything**: the digits and
+  "AnyDesk" are in no `text` field of any transcript in either run.
+- Our transport was clean: no frame dropped, no stall, none lost, 3 filler frames per call. The 912 + 3 frames are 58.6 s
+  of a 59.9 s call. So missing words are **not** explained by our pacing, resampling backlog or the connection.
+- Run 1, the number: after "मेरा नंबर है" (transcript at 18.0 s) Prisma's VAD fired one segment at 20.1 s that came back
+  **empty** (1.65 s of audio, latency 9 ms), then reported **no speech for 8.3 s** (20.1 to 28.4 s), then one segment
+  "सात चार एक" (1.94 s). A slowly read 10-digit number therefore reached us as at most two segments and three digit words.
+- Empty segments return in 7 to 13 ms. Segments with text take 148 to 430 ms. So the empty ones were not recognised
+  as speech at all (no recognition ran); this happened 6 times in 19 segments in run 1 and once in 8 in run 2.
+- Keyterms: `keyterms` is in `content/keyterms.json` for all of "CBI", "AnyDesk" and "KYC" (also "ED"). Run 1's `start`
+  event shows 0 keyterms given to the session and run 2's shows 57. `build_headers` adds the `keyterms` header only
+  when terms are given (header names without it: 9; with it: 10; value 668 characters), and the test with the fake
+  server reads that header off the wire. **Not proven from Prisma's side:** the `connected` message echoes no
+  keyterms in either run, so we cannot see that Prisma applied them. (This build now logs the header names it sent.)
+
+**What is a guess** (most likely first; none is proven)
+
+1. *The digits were too quiet or too isolated for Prisma's VAD (`x-vad-threshold 0.7`, `x-min-speech-ms 200`).* A slow
+   digit-by-digit reading is short, soft, isolated sounds with pauses between them; a speech-probability threshold of 0.7
+   is a likely reason for 8.3 s with no `speech_start`. The 6 empty segments (VAD fired, nothing recognised) fit this too.
+2. *The browser's own processing.* The page asks for noise suppression and automatic gain control (the Chrome defaults,
+   written out on purpose). Both can attenuate or gate short isolated sounds. Echo cancellation should be harmless with
+   headphones.
+3. *The digits were not spoken audibly in the window*, or in run 2 the first 30 s were silent. Our loudness count (8.3 s
+   voiced over the whole of run 2, against 16.9 s of text segments that include padding) leaves little room for a hidden
+   30 s of normal-volume speech, but it is not timestamped, so this is an inference.
+4. *"CBI" as "BBI" (run 1) and "EDBI" (run 2):* one sample each, different speech. In run 2 the list contains "ED", and
+   the output began with "ED"; the list also has short terms (ED, DoT, PAN) that could be pulling words. This is a hunch
+   and needs the same audio through both settings.
+5. *"AnyDesk" never appeared in either run, with or without the keyterm.* It may have fallen into an empty segment or
+   a gap, or been heard as something else; the logs cannot say.
+
+**What would separate the guesses (no audio or VAD change made yet):**
+
+- Free: run one call with `MIRAGE_SAVE_AUDIO=1` (saves the exact 8 kHz audio we send to `data/audio/`, deleted after 7
+  days) and listen to or measure the digit stretch. If the digits are audible there, the VAD is the cause; if they are
+  faint or missing, the browser path is.
+- For a fair keyterms comparison: replay that one saved clip through Prisma twice, with and without keyterms
+  (`scripts/smoke_prisma.py --keyterms ...`). Roughly 0.2 to 0.3 credits per run for a 30 to 40 s clip, estimated.
+- Possible later experiments (not done, they change settings): browser noise suppression and gain control off, a lower
+  `x-vad-threshold`.
+
+**Bug fixed:** the page's end-of-call line read "Ledger: 18.79 of (0.0%)" because the `ended` message did not carry the
+pool figures and the page printed the blanks. The message now includes `pool`, `pool_fraction` and `warning`, and the
+page leaves the ledger line alone if the figures are missing. A test runs the page's own code in Node (skipped if Node
+is missing) and fails when the old behaviour is put back.
+
+**Logging added** so the next run can be checked without guessing: the names of the headers actually sent (never values)
+and the whole raw transcript message from Prisma are now in the evidence log.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

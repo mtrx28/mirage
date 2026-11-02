@@ -288,7 +288,8 @@ def test_a_call_streams_frames_logs_a_transcript_and_charges_the_ledger(tmp_path
     assert summary["prisma"]["request_ids"] == ["req-1"]
     events = [json.loads(l)["event"] for l in (folder / "events.jsonl").read_text(encoding="utf-8").splitlines()]
     assert {"start", "prisma_connected", "speech_start", "processing", "end"} <= set(events)
-    assert (folder / "transcripts.jsonl").read_text(encoding="utf-8").count("haan ji boliye") == 1
+    lines = (folder / "transcripts.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(l)["text"] for l in lines] == ["haan ji boliye"]
 
 
 def test_the_api_key_is_never_written_to_disk_or_sent_to_the_page(tmp_path):
@@ -442,6 +443,7 @@ class FakeLink:
     def __init__(self, cfg, key, on_message, on_closed, keyterms=None):
         self.on_message, self.frames, self.keyterms = on_message, [], keyterms
         self.request_ids, self.reconnects, self.frames_lost, self.closed = ["fake"], 0, 0, False
+        self.sent_header_names, self.keyterms_header_chars = ["model"], 0
         FakeLink.instances.append(self)
 
     async def open(self):
@@ -577,3 +579,74 @@ def test_the_page_code_has_no_dialer_and_no_outside_addresses():
     assert "https://" not in text
     assert "ws://" in text and "location.host" in text
     assert "tel:" not in text and "RTCPeerConnection" not in text
+
+
+# ------------------------------------------------------------------ evidence added after the first real runs
+def test_the_log_names_the_headers_sent_and_keeps_the_raw_transcript_message(tmp_path):
+    fake = FakePrisma(reply_after=3)
+    result, _ = run_session(tmp_path, fake, seconds=0.5)                  # this helper passes keyterms=["AnyDesk"]
+    folder = result["cfg"].calls_dir / result["session"].log.call_id
+    events = [json.loads(l) for l in (folder / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    sent = next(e for e in events if e["event"] == "prisma_headers_sent")
+    assert "keyterms" in sent["names"] and sent["keyterms_header_chars"] > 0
+    assert KEY not in json.dumps(sent)                                    # names only, never values
+    first = json.loads((folder / "transcripts.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert first["raw"]["type"] == "transcript" and first["raw"]["is_final"] is True
+
+
+def test_without_keyterms_the_log_shows_no_keyterms_header(tmp_path):
+    async def body(url):
+        cfg = make_cfg(tmp_path, prisma_url=url)
+
+        async def notify(m): pass
+
+        session = CallSession(cfg, passthrough_gate, Ledger(cfg), notify, key=KEY, keyterms=None)
+        await session.start(48000)
+        await session.hangup()
+        return cfg, session
+
+    cfg, session = with_fake_prisma(FakePrisma(), body)
+    events = [json.loads(l) for l in (cfg.calls_dir / session.log.call_id / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    sent = next(e for e in events if e["event"] == "prisma_headers_sent")
+    assert "keyterms" not in sent["names"] and sent["keyterms_header_chars"] == 0
+
+
+def test_the_ended_message_carries_the_pool_figures_the_page_needs(tmp_path):
+    result, notes = run_session(tmp_path, FakePrisma(reply_after=99), seconds=0.3)
+    ended = notes[-1]
+    assert ended["type"] == "ended" and ended["pool"] == 5000.0
+    assert 0 < ended["pool_fraction"] < 0.01 and ended["warning"] is False
+
+
+def test_the_page_shows_the_pool_when_a_call_ends_and_never_a_half_filled_line():
+    """Runs the page's own code in Node with a stub page (skipped if Node is not installed)."""
+    import shutil
+    import subprocess
+    if shutil.which("node") is None:
+        pytest.skip("node is not installed")
+    script = r"""
+    const fs = require("fs"), vm = require("vm");
+    const store = {};
+    const el = (id) => store[id] || (store[id] = { id, textContent: "", style: {}, disabled: false, addEventListener() {},
+                                                  appendChild() {}, scrollTop: 0, scrollHeight: 0 });
+    const ctx = vm.createContext({ document: { getElementById: el, createElement: () => ({ appendChild() {} }),
+                                               createTextNode: () => ({}) },
+                                   window: { addEventListener() {}, isSecureContext: true },
+                                   navigator: {}, fetch: () => Promise.reject(new Error("no network")),
+                                   setTimeout, location: { host: "x" }, WebSocket: { OPEN: 1 } });
+    vm.runInContext(fs.readFileSync("mirage/web/app.js", "utf8"), ctx);
+    const send = (m) => vm.runInContext("onServerMessage(" + JSON.stringify(m) + ")", ctx);
+    send({type: "tick", held_s: 5, call_credits: 0.1, ledger_spent: 18.5, pool: 5000, pool_fraction: 0.0037, warning: false});
+    send({type: "ended", reason: "hangup", call_credits: 0.14, ledger_spent: 18.79, pool: 5000, pool_fraction: 0.0038,
+          warning: false, held_s: 57, transcripts: 7});
+    console.log(JSON.stringify({ledger: store.ledger.textContent, pool: String(store.pool.textContent), pct: store.poolPct.textContent,
+                                call: store.callCredits.textContent}));
+    // an "ended" message that lacks the pool must not blank out the line already on screen
+    send({type: "ended", reason: "hangup", call_credits: 0.2, ledger_spent: 18.9, held_s: 60, transcripts: 8});
+    console.log(JSON.stringify({ledger: store.ledger.textContent, pool: String(store.pool.textContent), pct: store.poolPct.textContent}));
+    """
+    out = subprocess.run(["node", "-e", script], capture_output=True, text=True, cwd=ROOT, timeout=30)
+    assert out.returncode == 0, out.stderr
+    first, second = [json.loads(line) for line in out.stdout.strip().splitlines()]
+    assert first == {"ledger": "18.79", "pool": "5000", "pct": "0.4%", "call": "0.14"}
+    assert second["pool"] == "5000" and second["pct"] == "0.4%"           # unchanged, not blanked

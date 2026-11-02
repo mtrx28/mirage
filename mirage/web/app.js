@@ -68,7 +68,7 @@ function addTranscript(text, t) {
 
 function showCredits(call, ledger, pool, fraction, warning) {
   els.callCredits.textContent = call.toFixed(2);
-  if (ledger !== undefined) {
+  if (ledger !== undefined && pool !== undefined) {          // never show a half-filled "of (0.0%)" line
     els.ledger.textContent = ledger.toFixed(2);
     els.pool.textContent = pool;
     els.poolPct.textContent = (fraction * 100).toFixed(1) + "%";
@@ -109,7 +109,7 @@ function onServerMessage(msg) {
     case "ended": {
       ended = true;
       els.held.textContent = mmss(msg.held_s);
-      showCredits(msg.call_credits, msg.ledger_spent, undefined, 0, false);
+      showCredits(msg.call_credits, msg.ledger_spent, msg.pool, msg.pool_fraction, msg.warning);
       const why = END_REASONS[msg.reason] || ("The call ended (" + msg.reason + ").");
       setStatus(why + " Call length " + mmss(msg.held_s) + ", " + msg.transcripts + " transcript(s), about " +
                 msg.call_credits.toFixed(2) + " credits.");

@@ -92,6 +92,8 @@ class CallSession:
             self.log.event("prisma_open_failed", error=str(e))
             await self._finish("prisma_unavailable")
             raise
+        self.log.event("prisma_headers_sent", names=self.link.sent_header_names,
+                       keyterms_header_chars=self.link.keyterms_header_chars)
         self.pacer = Pacer(self._send_frame, self.cfg)
         self._tasks = [asyncio.create_task(self.pacer.run()), asyncio.create_task(self._ticker())]
         self.meter.flush(force=True)                         # counts this call as one request in the ledger
@@ -126,7 +128,7 @@ class CallSession:
             record = {"text": text, "audio_s": round(audio_s, 3), "server_latency_ms": msg.get("latency"),
                       "language": msg.get("detected_language_code"), "segment_id": msg.get("segment_id"),
                       "utterance_id": msg.get("utterance_id")}
-            self.log.transcript(**record)
+            self.log.transcript(**record, raw=msg)                   # the whole message as Prisma sent it
             if text:
                 self.transcripts.append({"t": round(self.log.now(), 2), **record})
                 await self.notify({"type": "transcript", "text": text, "t": round(self.log.now(), 1)})
@@ -201,7 +203,9 @@ class CallSession:
         self.log.finish(summary)
         try:
             await self.notify({"type": "ended", "reason": reason, "call_credits": round(self.meter.credits, 3),
-                               "ledger_spent": round(self.ledger.spent, 2), "held_s": round(self.log.now(), 1),
+                               "ledger_spent": round(self.ledger.spent, 2), "pool": self.cfg.pool_credits,
+                               "pool_fraction": round(self.ledger.fraction_of_pool(), 4),
+                               "warning": self.ledger.warning(), "held_s": round(self.log.now(), 1),
                                "transcripts": len(self.transcripts)})
         except Exception:                                    # the page may already be gone
             pass

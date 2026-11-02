@@ -91,12 +91,16 @@ class PrismaLink:
     _reader: asyncio.Task | None = field(default=None, repr=False)
     _closing: bool = field(default=False, repr=False)
     request_ids: list[str] = field(default_factory=list)
+    sent_header_names: list[str] = field(default_factory=list)      # names only, never values (the key is one)
+    keyterms_header_chars: int = 0
 
     def _safe(self, text: object) -> str:
         return scrub(str(text), [self.key])
 
     async def _open_once(self) -> dict:
         headers = build_headers(self.cfg, self.key, self.keyterms)
+        self.sent_header_names = sorted(headers)
+        self.keyterms_header_chars = len(headers.get("keyterms", ""))
         try:
             ws = await self.connect(self.cfg.prisma_url, additional_headers=headers, ping_interval=None,
                                     open_timeout=self.cfg.connect_timeout_s)
