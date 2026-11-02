@@ -62,7 +62,7 @@ class FSMConfig:
     readback_max_digits: int = 6     # ... and at most this many characters
     max_readbacks: int = 6           # per call, so a long dictation cannot loop forever
     digit_group: int = 3             # digits are spoken in groups of this size
-    digit_style: str = "words"       # "words" (ek, do, teen) or "numerals" (spaced digits); see the log: unverified with Timbre
+    digit_style: str = "spaced"      # "spaced" ("0 0 4, 7 1 3", chosen by listening) or "words" (zero zero chaar); see the log
     llm_min_gap_turns: int = 3       # the LLM fallback is used at most once in this many turns
     synthetic_mode: bool = False     # accept 00-prefixed phone numbers (staged demo only)
 

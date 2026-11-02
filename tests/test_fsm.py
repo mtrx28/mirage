@@ -380,7 +380,7 @@ def test_a_readback_uses_only_the_callers_digits_and_records_where_they_came_fro
     assert source.origin == "caller" and source.quote == finding.quote and source.source_index == finding.source_index
     assert finding.value.startswith(source.digits) and len(source.digits) < len(finding.value)   # a part, never the whole
     assert 3 <= len(source.digits) <= 6
-    assert source.spoken == "chaar zero zero, teen nau"
+    assert source.spoken == "4 0 0, 3 9"          # spaced numerals, the chosen default
     assert_traceable(plan, brain)
     assert plan.awaiting_digits and plan.expected == "account"
 
@@ -444,14 +444,46 @@ def test_the_gate_hook_sees_every_plan_and_its_replacement_is_used():
 # ---------------------------------------------------------------- the pieces
 
 def test_digits_are_spoken_in_small_groups_and_facts_render_from_the_sheet():
-    assert speak_digits("0047138") == "zero zero chaar, saat ek teen, aath"
-    assert speak_digits("0047", style="numerals") == "0 0 4, 7"
-    assert speak_code("MIRG00") == "M I R, G zero zero"
+    assert speak_digits("0047138") == "0 0 4, 7 1 3, 8"                         # the default is spaced numerals
+    assert speak_digits("0047138", style="words") == "zero zero chaar, saat ek teen, aath"
+    assert speak_code("MIRG00") == "M I R, G 0 0"
     persona = load_persona()
     spoken, pairs = render_fact(persona.fact("address"))
-    assert "ek do" in spoken and pairs == [("12", "ek do")]
+    assert "Flat 1 2," in spoken and pairs == [("12", "1 2")]
     with pytest.raises(ValueError):
         speak_digits("12a")
+    with pytest.raises(ValueError):
+        speak_digits("12", style="numerals")                                    # the old name is gone: one name per style
+
+
+def test_spaced_numerals_are_the_default_in_the_config_and_in_every_spoken_digit_string():
+    import re
+    from mirage.spoken import DEFAULT_DIGIT_STYLE
+    assert DEFAULT_DIGIT_STYLE == FSMConfig().digit_style == "spaced"
+    persona = load_persona()
+    # Uncle's own details, straight from the fact sheet
+    for key in ("phone", "account"):
+        spoken, _ = render_fact(persona.fact(key))
+        assert re.fullmatch(r"[0-9 ,]+", spoken), spoken
+    assert re.fullmatch(r"[A-Z0-9 ,]+", render_fact(persona.fact("ifsc"))[0])
+    # ... through the brain, for each fact the caller can ask about
+    for ask, key in [("aapka phone number bataiye", "phone"), ("aapka account number bataiye", "account"),
+                     ("aapka IFSC bataiye", "ifsc"), ("aapka pata bataiye", "address")]:
+        brain = at_stage("S3")
+        plan = say(brain, ask).plan
+        assert plan.tactic == "give_own_detail" and plan.digit_sources
+        for source in plan.digit_sources:
+            assert not re.search(r"zero|chaar|paanch|saat|aath", source.spoken), source.spoken
+            assert re.fullmatch(r"[A-Z0-9 ,]+", source.spoken) or key == "address"
+        assert not any(w in plan.text for w in ("zero", "chaar", "paanch", "chhe ", "saat ", "aath"))
+    # ... and in a read-back of the caller's own digits
+    brain = at_stage("S3")
+    plan = say(brain, "account number hai chaar zero zero teen nau ek aath do saat").plan
+    assert plan.tactic == "readback_partial" and re.fullmatch(r"[0-9 ,]+", plan.digit_sources[0].spoken)
+    # the style can still be switched in the config, and then it is used everywhere
+    brain = CallBrain(config=FSMConfig(digit_style="words"))
+    brain.state.stage, brain.state.turn = "S3", 1
+    assert say(brain, "aapka phone number bataiye").plan.digit_sources[0].spoken.startswith("zero zero zero, zero do")
 
 
 def test_ends_with_digits():

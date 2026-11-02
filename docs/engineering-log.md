@@ -353,6 +353,29 @@ Regression check against the rules before this change:
 
 Nothing that passed before fails now. Set 3 (the friend's) was not read or scored.
 
+### Set 3 (friend, held out): 12 of 20 (2 Nov 2026)
+
+**set 3 (friend, held out): 12 of 20, scored once, no rules changed afterwards, 3 more had the right stage as their best
+guess below the minimum.** The `customs` change (moved to S1) was made before set 3 was scored, and the file's content was
+never edited (it was written once by the friend and scored once). The missed lines are not printed in the report and stay
+unprinted. This is the honest "closer to a real caller" number for the rules as they stand; it is not an accuracy figure.
+
+Sample-size caveats for reading sets 2 and 3 side by side: (1) **they have different writers** (set 2 the owner, set 3 the
+friend), so a higher or lower score may be partly the writer's style, not the rules; (2) **7 of set 2's 18 lines were out of
+scope** (electricity, TRAI, relative in trouble), which is why set 2 is also reported as in-scope 5 of 11; set 3 was asked to
+cover only the implemented scam types; (3) both sets are tiny (18 and 20 lines), so one line is 5 to 6 points.
+
+### Digits, by listening (2 Nov 2026): spaced numerals
+
+The owner listened to the four Prakash versions from `scripts/smoke_digits_tts.py` (digit words, spaced numerals, plain
+numerals, Devanagari digit words). Devanagari and spaced numerals sounded most natural; **spaced numerals ("0 0 4, 7 1 3") were
+chosen**. It is a single sample of each version, one listener, one voice, one phrase: a preference, not a measurement, and
+it says nothing about how intelligible the digits are to a caller on a phone line at 8 kHz. `FSMConfig.digit_style` and
+`mirage/spoken.py` now default to `"spaced"` (the other value is `"words"`); the old name `"numerals"` is gone. Every
+spoken digit string uses the configured style: Uncle's own details from the fact sheet (phone, account, IFSC, the flat
+number in the address) and read-backs of the caller's digits, and a test checks this. Replies now contain numerals, so the
+safety gate will compare digits after stripping spaces and commas.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
