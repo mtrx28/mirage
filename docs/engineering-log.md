@@ -785,6 +785,147 @@ on each digit piece; letting the hold treat "ended in a digit, then a stray word
 pieces have settled; matching a misheard repeat to a labelled number by edit distance. Which of these matters depends on how often
 real callers dictate this way, which tomorrow's session will show.
 
+## Friend session (staged role-play, development data, NOT a test or an evaluation)
+
+Five calls on 2026-11-02 and 2026-11-03 (`20261102_213144_51f5`, `20261102_215332_4cbc`, `20261102_215945_f364`, `20261102_220654_809b`,
+`20261103_002511_fca7`), one friend playing the caller, one computer, one microphone. This is staged role-play used to find problems. It
+says nothing about real scammers, and no number below is a rate or a result for the write-up. This was a read-only look at `data/calls/*`
+(no code changed, nothing sent to Gnani or Gemini); the figures come from throwaway scripts that are not in the repo. As a cross-check, the
+real stage rules (`load_rules`, `score_line`, `decide_stage`) were re-run on the logged text of all 101 turns and reproduced every logged
+stage decision (0 differences), so the stage reasons quoted below are what the code really did.
+
+**1. Per call.** Counters were 0 in all five calls: `mute_anomalies`, `capture_stalls`, `playback_done_missing`, `unspoken_turns`. Also
+0: Prisma reconnects, `frames_lost`, `dropped_frames`, `resyncs`. Every line passed the gate, was spoken, had no TTS error and was not
+interrupted (101 of 101). Every fresh line took 1 attempt (no 429 seen).
+
+| call | length | turns | generic_stall | other tactics | stage path | ended |
+|---|---|---|---|---|---|---|
+| 1 | 276.3 s | 21 | 12 (57.1%) | alarm 2, readback_partial 2, greet_confused 1, mishear_name 1, ask_identity 1, ask_detail_slow 1, willing_ask_payment 1 | S0 S1 S3 | hangup |
+| 2 | 202.6 s | 16 | 10 (62.5%) | mishear_name 2, greet_confused 1, willing_ask_payment 1, ask_detail_slow 1, stall_look_for_things 1 | S0 S3 | hangup |
+| 3 | 217.6 s | 18 | 10 (55.6%) | ask_detail_slow 3, alarm 2, greet_confused 1, ask_identity 1, stall_look_for_things 1 | S0 S1 | hangup |
+| 4 | 239.1 s | 21 | 15 (71.4%) | mishear_name 2, ask_detail_slow 2, greet_confused 1, willing_ask_payment 1 | S0 S3 | hangup |
+| 5 | 273.0 s | 25 | 16 (64.0%) | mishear_name 2, alarm 2, greet_confused 1, give_own_detail 1, ask_identity 1, ask_detail_slow 1, goodbye_wrap 1 | S0 S1 S5 | uncle_ended |
+
+Together: 101 turns, **63 generic_stall = 62.4%**. Those 63 are only four lines, three of which say Uncle did not hear or understand:
+"Hello? Line kat kat ke aa rahi hai" 17, "Haan? Kya kaha beta? ... sunai nahin diya" 16, "Achha achha... samajh nahin aaya" 15, and
+"Haan ji haan ji, main sun raha hoon, aap boliye aage" 15. In all, 30 distinct lines in 101 turns. Only call 1 captured an identifier
+(the case reference, below); `findings.json` is empty in calls 2 to 5, so the call's actual purpose (draw out payment evidence) was not
+met in this session. Credits: 3.04, 1.38, 1.66, 1.52 and 1.60 (9.19 for the five, by the estimate). `summary.json` of call 5 says 24 turns
+and 24 lines spoken but `turns.jsonl`, the event log and the gate log all have 25: the final goodbye turn is not counted in the summary.
+Raw audio was saved for all five calls (`audio_saved` true, in `data/audio/`).
+
+**2. Replies close together, and talk-over.** No two Uncle replies were scheduled less than 3 s apart. The shortest start-to-start gap
+is 4.50 s (call 4, turns 1 and 2: the first line ran 4.19 s and the second began 0.31 s after unmute); the next shortest is 5.83 s
+(call 1); everywhere else 8 s or more. The hold rule never had to act (0 scheduler events; the extra hold on any turn was at most
+0.03 s). I could not find "4.55 s and 5.66 s" in the call 4 files; the first-audio times are 4.578 and 9.078. Uncle's mic is muted for
+33 to 39% of each call, so the logs cannot show speech that happened under his voice. What they do show (events plus transcript times):
+
+- *The caller was already speaking when Uncle's first byte went out* (3 of 101 lines). Call 1 line 16: a new utterance began 0.30 s before
+  the audio, 0.14 s after the reply had been decided, while the fresh line was still coming back from Timbre (first byte 0.44 s later); the
+  caller's "Official का।" arrived while muted. Call 4 line 1: the friend said "Hello", "Hello sir", then began "Electric..."; Prisma's
+  speech-start event for it arrived 0.03 s after Uncle's first byte, so the word began before him; the rest of the sentence was lost and
+  Uncle's second reply (at 9.08 s) answered only "Electric". Call 5 line 13: after three short pieces ("अच्छा।", "मैं।", "एक minute") a
+  fourth speech-start event arrived 0.02 s after Uncle started and the piece came back empty.
+- *The caller's speech began within 0.6 s of unmute* (7 of 101 lines: call 1 lines 5 and 12, call 2 line 1, call 3 line 2, call 4 line
+  15, call 5 lines 2 and 15), so the first part of that utterance probably fell under the end of Uncle's line or the 0.3 s holdoff.
+- That is 10 of 101 lines (about 10%) with evidence of overlap at an edge; 3 of them were in call 5 (lines 2, 13, 15). 6 of the 10 were
+  on cached lines (cached lines are 70% of all lines), so Timbre delay is not the cause.
+- At the moment the friend said "आप बार-बार बीच में बोल रहे हैं" (call 5, 219 to 222 s) no overlap is recorded: the friend's "Sir, sorry"
+  began about 1 s after Uncle's line 20 had ended, and Uncle's line 20 itself began 0.7 s after the end of a 5.7 s sentence. So the
+  complaint is **partly real but not shown by a specific collision at that time**. The nearest recorded cut-ins are lines 13 (137.8 s) and
+  15 (159.8 s). A likely extra cause is by design: Uncle answers about 1.35 s after the caller stops (p50), which a friend reading a
+  script and pausing for about a second will feel as being cut in on, and then he talks for 3 to 5 s and cannot be answered.
+
+**3. Gate.** No gate action other than pass in any call (`gate_action` empty and `gate_notes` empty on all 101 turns; `gate_log` is
+"pass" on every entry; its turn numbers are one lower than `turns.jsonl`). **Call 1 turn 9 was not a gate replacement.** The brain
+itself chose generic_stall, because the caller's whole turn was the single word "चार।" and a lone digit is not a finding. The earlier
+digit mismatch (finding 3 above: the gate refused a read-back of "0000") did not happen in this session. What did happen is the
+neighbouring weakness: turn 8 read back "1 2 3" and asked for the rest, the caller said only "चार", and Uncle replied "samajh nahin
+aaya, ek baar phir se boliye" because digits are joined only within one turn, not across turns.
+
+**4. Stage: the path and the exact words.** There is no negation handling in the stage scoring (`score_text` is a bag of keywords).
+
+| call | move | words that moved it | negation near them? |
+|---|---|---|---|
+| 1 | S0 to S1 at 70.7 s | "suspicious" +2.0 (the minimum is 2.0), in "कुछ suspicious documents और restricted items report हुए हैं" | no |
+| 1 | S1 to S3 at 214.1 s | "payment" +3.0, in "payment demand का reference बता सकता हूँ। आपको बिना समझे कोई payment नहीं करनी चाहिए" | **yes**: "बिना ... नहीं" (a warning not to pay) |
+| 2 | S0 to S3 at 143.5 s | "Payment" +3.0, in "कुछ callers ... Payment करने को बोल सकते हैं। आप ऐसे मत कर करिएगा" | **yes**: "मत" is 8 words after "Payment", in the next sentence |
+| 3 | S0 to S1 at 16.7 s | "police" +1.5, "inspector" +1.0 | no |
+| 4 | S0 to S3 at 70.6 s | "payment" +3.0, in "system में payment reflect नहीं हुआ" | a "नहीं", but the caller really was pressing for payment |
+| 5 | S0 to S1 at 109.5 s | "senior officer" +1.5, "officer" +1.0 | no |
+| 5 | S1 to S5 at 266.8 s | "disconnect" +2.0, in "call disconnect करता हूँ" | no |
+
+So in call 2 yes, the move came on a warning ("don't do it"), and so did call 1's move to S3. In call 3 the same kind of sentence ("तो payment
+करने की जरूरत नहीं है") scored S3 4.3 against S1 3.55, and the call stayed in S1 only because the current stage gets a +1.0 stickiness
+bonus (4.55): a margin of 0.25. The same layer misfired in the signals: "OTP पिन या password किसी को मत बताएँ" (call 2) and "OTP, OTP,
+PIN या bank details किसी को मत दीजिए" (call 3) raised `ask_otp` and `ask_credential`, so Uncle answered a warning as if he had been asked
+for a code (stall_look_for_things); S4 reached 2.0 in call 2 but stickiness again held the stage at S3. Call 4 shows why a plain "any
+negation in the turn cancels the keyword" rule is wrong: its "नहीं" belongs to "reflect", not to a request. This matters for stage 2 of the
+safety gate: a benign caller who warns about payments or codes scores like a scam.
+
+**5. Latency, friend role-play, 5 calls, 101 turns.** "Heard to audible" is from the last transcript's arrival to sound on the page;
+"minus wait" removes the 0.3 s (or 1.8 s digit-mode) wait; "end of speech" is the estimated end of the caller's speech (the transcript
+arrives at least 0.5 s after it).
+
+| group | n | heard to audible p50 / p95 | minus wait p50 / p95 | end of speech to audible p50 / p95 |
+|---|---|---|---|---|
+| ordinary turn, cached line | 65 | 0.45 / 0.47 s | 0.14 / 0.14 s | 1.29 / 1.41 s |
+| ordinary turn, fresh line (Timbre) | 26 | 0.73 / 0.87 s | 0.42 / 0.56 s | 1.60 / 1.71 s |
+| digit-mode turn (cached 6, fresh 4) | 10 | 1.95 / 2.27 s | 0.14 / 0.46 s | 2.84 / 3.15 s |
+| all turns | 101 | 0.45 / 1.95 s | 0.14 / 0.47 s | 1.35 / 2.83 s |
+
+Timbre first byte on the 30 fresh lines: p50 297 ms, p95 415 ms. Brain at most 4.8 ms, gate at most 1.5 ms. p95 on groups of 10 to 26 is
+close to the maximum; read it as a range, not a percentile. 71 of 101 lines (70%) came from the in-memory cache. A cached line is not
+free of work, only of Timbre. Digit mode applied to 10 turns, and only 2 of them (call 1, turns 8 and 9) contained digits; the other 8
+paid an extra 1.5 s because Uncle had just asked for a number and the caller answered with something else.
+
+**6. Repeated or stray syllables.** The three examples ("बोल र रहा", "rest triction", "veri ify") are **not in any saved transcript**:
+I searched all 13 folders in `data/calls/`, and the saved text has "बोल रहा" and "restriction" whole. If they came from the page, I do not
+know where. What is there are repeats that read like ordinary speech from a person who speaks fast: "connect, connect" (call 1), "कर
+करिएगा" and "आप आपने" (calls 2 and 4), "OTP, OTP" (call 3), "आपका आपके" and "मैं main senior" (call 5), "मुझे, मुझे, मुझसे" (call 5),
+"हुआ" at the end of one piece and the start of the next (call 3), plus pieces of one word ("अच्छा।", "मैं।", "चार।") and one empty
+transcript. About 10 of 133 transcripts. They do not cluster at an unmute: the share of flagged transcripts that began within 1 s of an
+unmute (7 of 20, and my detector was noisy) is no higher than the share of all transcripts that did (59%). On our side the counters are
+clean (no dropped frames, no resyncs, no reconnects, no lost frames), which argues against the pacer. It does not clear the resampler,
+the browser's own noise suppression, or the service; transcript text with no word timestamps cannot separate them. The clean test is to
+send one saved clip (`data/audio/<id>/mic_8k.wav`) straight to Prisma and compare; that costs credits and is the owner's call.
+
+**7. Why 1234 was not a "keyword" case in call 1.** It was labelled a case, but at the lower confidence. The extractor sees only the
+transcripts of the current turn. "Case reference" and "0000" and "एक, दो, तीन, चार" were in one turn (7), so that turn gave
+`00001234`, kind case, confidence keyword. The caller's repeat "एक, दो, तीन, चार।" was a separate turn (8) with no keyword in it, so
+it was classed only through Uncle's own hint after his read-back (`expected` = case): `1234`, kind case, confidence expected, needs
+confirmation. The previous turn's text feeds the stage score, not the extractor. Result: two case cards, one a suffix of the other.
+The fragment clean-up only drops unlabelled "ambiguous" runs, so a labelled `expected` suffix stays.
+
+**8. What triggered goodbye_wrap at 266 s in call 5.** The caller's words "ठीक है sir call disconnect करता हूँ।". The word
+"disconnect" scores +2.0 for S5 (the minimum), the brain moved S1 to S5, and the S5 rule picks goodbye_wrap, which ended the call
+(`uncle_ended`). It was not a time or credit limit (the call was 273 s). The near-identical "मैं call end करता हूँ" (call 1, turn 20; call
+3, turn 18) and "call close करता हूँ" (call 2, turn 16) have no S5 word, so Uncle just stalled and the call ended by hangup.
+
+**Not verified or still open:** whether the strays are ours or the service's; what the friend meant by "keep interrupting" beyond the
+10 edge cases; any real-caller rate for anything above.
+
+**Fixes I would suggest, by value against effort (none made; the owner decides):**
+
+1. *More and better stall lines* (value high, effort low: content in `lines.json` plus the existing lint). 62% of replies are four lines,
+   three of them "I did not hear", said to a friend who was perfectly clear. Add a few that keep the caller going and ask for the next
+   step ("Toh ab mujhe kya karna hai?", "Aur kuch batana hai?"). Each fresh line costs a few hundredths of a credit once.
+2. *Make keyword scoring negation-aware for payment and code words* (value high for stage 2 of the safety gate, effort medium). Look for
+   "मत / नहीं / बिना / don't / not / no need" tied to the request verb (करने, देने, बताएँ, करनी), in the same or the next sentence, and
+   not "reflect नहीं हुआ". Needs new tests; the friend's held-out file stays untouched. Do this before calibrating the scam score.
+3. *Apply the digit wait only when it can matter* (value medium, effort low): only if the caller's turn contains digit words or ends
+   in digits, and only for the turn right after the ask. That removes about 1.5 s from 8 of 10 digit-mode turns here, but keep it away
+   from the slow-dictation case (finding 2 of the solo check) by still waiting when digits are present.
+4. *Treat the call-end phrases as S5 words* ("call end", "call close", "ठीक है ... बंद") (value low-medium, effort low), so Uncle
+   says goodbye whenever the caller does.
+5. *Cancel a decided reply if the caller begins speaking before Uncle's first byte is sent* (value low-medium, effort medium): covers
+   call 1 line 16. Costs one wasted Timbre line each time it fires.
+6. *Join a lone digit or short digit piece to the number Uncle just read back* (value medium, effort medium; solo findings 1 to 3).
+7. *Drop a labelled-`expected` suffix of a longer same-kind number from the cards* (value low, effort low) and count the goodbye turn
+   in `summary.json` (value low, effort trivial).
+8. *Let the caller talk over Uncle (barge-in)* (value high, effort high: needs echo handling, headphones only, a new test). Not for now.
+9. If strays recur: send one saved clip straight to Prisma and compare, before touching the pacer.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
