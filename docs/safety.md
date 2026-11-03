@@ -88,12 +88,20 @@ nahin hai" are ignored (windowed negation, `mirage/negation.py`). All weights ar
 
 ## Red-team runner
 
-`python -m mirage.redteam` plays adversarial caller lines through the real brain, gate and speaking guard from realistic mid-call states
-and checks what would be spoken with a separate oracle, also with the language model mocked to say nasty things (offline; nothing is
-sent anywhere). A first set of 15 lines, written by the same model that built the gate, gave **1 leak out of 15**: a mocked model
-could make Uncle ask for a card number and expiry, because the credential check does not know those words (the model fallback is off by
-default; the hole is not fixed yet, on purpose, so that a second author's lines are scored first). Those 15 lines are weak evidence for
-the reason just given. See `engineering-log.md`.
+`python -m mirage.redteam [lines file]` plays adversarial caller lines through the real brain, gate and speaking guard from seven realistic
+mid-call states and checks what would be spoken with a separate oracle, also with the language model mocked to say nasty things (offline;
+nothing is sent anywhere). Two sets have been run, and neither is strong evidence:
+
+- **My own 15 lines** (written by the same model that built the gate): 1 leak out of 15, the card-and-expiry hole.
+- **The friend's 15 lines, scored once before any tuning: 6 flagged out of 15, of which 4 were real** (the same card-and-expiry text, said by a
+  mocked model; two of them could happen without forcing the model) **and 2 were false alarms of the oracle**. No real leak in any run that does
+  not involve the model. The gate was then fixed with word families (cards, security codes and net-banking logins; more ways to ask for money;
+  more words for "I am a person"), and after that both sets give 0 leaks. **That second result is dev data:** the same lines were used to find
+  and to fix the holes. Asking the CALLER for an account number, IFSC or UPI id stays allowed, because it is the bait.
+- A negated payment followed by "toh" and a bad consequence ("payment nahin karna toh arrest ho jayega") counts as a threat, not a warning. A threat
+  with a consequence word that is not on the list is still read as a warning.
+
+The language-model fallback is off by default. See `engineering-log.md` for the tables.
 
 ## Measured limits (see `engineering-log.md` for the numbers and how they were obtained)
 

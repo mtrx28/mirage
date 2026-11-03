@@ -57,15 +57,29 @@ _TAG_RE = re.compile(r"<[^<>]*>")
 # A line must never claim Uncle is a person, or talk about robots or AI at all: the answer to a sincere
 # "are you a robot?" belongs to the safety gate, not to a template.
 IDENTITY_WORDS = re.compile(
-    r"\b(insaan|insan|human|person|robot|bot|machine|ai|artificial|computer|program|asli|real)\b", re.IGNORECASE)
-# Uncle never asks the caller for money or credentials.
+    r"\b(insaan|insan|human|person|robot|bot|machine|ai|artificial|computer|program|asli|real|"
+    r"aadmi|admi|aurat|mard|manushya|manav)\b", re.IGNORECASE)
+# Uncle never asks the caller for money or credentials. These are WORD FAMILIES, not single phrases: a secret (a code, a PIN, a
+# password, a card and its expiry or security code, a net-banking login, Aadhaar, PAN) followed by a request, or "your" + a secret.
+# NOT in the family on purpose: a bank account number, IFSC or UPI id. Asking the CALLER for those is the whole point of the bait
+# (Uncle must be able to say "account number kya hai?"); they are the caller's payment destination, not a secret of the victim.
+_SECRET = (r"otp|password|passcode|pin|mpin|cvv|cvc|aadhaar|aadhar|pan|card|atm|expiry|expire date|valid thru|security code|"
+           r"secret code|verification code|login|login id|username|user id|customer id|net banking|netbanking|internet banking")
+_ASK_VERB = (r"bataiye|batao|batayiye|batayein|bolo|boliye|bhejiye|bhejo|bhejein|dijiye|do|dena|de dijiye|de do|likhwa|likhwaiye|"
+             r"likhwa dijiye|likhiye|share|send|tell|give|enter|dalo|daliye")
 ASKS_FOR_CREDENTIALS = re.compile(
-    r"\b(aapka|aap ka|aapke|apna|apne)\b[^.?!]*\b(otp|password|pin|cvv|aadhaar|aadhar|pan)\b"
-    r"|\b(otp|password|pin|cvv|aadhaar|aadhar)\b[^.?!]*\b(bataiye|batao|bolo|boliye|bhejiye|bhejo|dijiye|do)\b",
+    rf"\b(aapka|aap ka|aapke|aapki|aap ki|apna|apne|apni|your)\b[^.?!]*\b({_SECRET})\b"
+    rf"|\b({_SECRET})\b[^.?!]*\b({_ASK_VERB})\b",
     re.IGNORECASE)
+_MONEY = r"paise|paisa|rupaye|rupiye|rupees|raqam|money|amount|payment|fees|fee|charges|deposit|lakh|hazaar|hajar|fine|penalty"
+_MONEY_VERB = (r"bhejiye|bhejo|bhej do|bhej dijiye|bhejein|dijiye|do|dena|de do|de dijiye|daal do|daal dijiye|daalo|daliye|dalo|"
+               r"jama kijiye|jama karo|jama kar do|jama kar dijiye|transfer karo|transfer kijiye|transfer kar do|transfer kar dijiye|"
+               r"kar do|kar dijiye|kijiye|karo|bharo|bhariye")
 ASKS_FOR_MONEY = re.compile(
-    r"\b(paise|paisa|rupaye|raqam|money)\b[^.?!]*\b(bhejiye|bhejo|dijiye|do|dena)\b"
-    r"|\b(mujhe|mujhko|humein)\b[^.?!]*\b(paise|rupaye|raqam)\b",
+    rf"\b({_MONEY})\b[^.?!]*\b({_MONEY_VERB})\b"
+    r"|\b(mujhe|mujhko|humein)\b[^.?!]*\b(paise|paisa|rupaye|raqam)\b"
+    r"|\b(mere|meri|is|iss)\b[^.?!]{0,20}\b(account|upi|khate)\b[^.?!]{0,25}"
+    r"\b(daal|daal do|daal dijiye|daalo|bhejiye|bhejo|bhej do|jama|jama kijiye|transfer karo|transfer kijiye)\b",
     re.IGNORECASE)
 # Uncle never says he ALREADY sent money, installed, clicked or shared a code. He only talks about doing it.
 CLAIMS_AN_ACTION = re.compile(

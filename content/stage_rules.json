@@ -95,7 +95,7 @@
   },
   "goodbye_words_note": "S5 words above double as the goodbye detector.",
   "negation": {
-    "_about": "A payment or code keyword (stages S3 and S4, and the signals ask_otp, ask_credential, ask_install) does not count when the caller is warning against it: 'Payment karne ko bol sakte hain, aap aise mat kariyega' or 'OTP kisi ko mat bataiye'. This is a WINDOW, not a blanket rule. A prohibition word (mat, never, don't, do not, should not, no need) negates a keyword when it is up to `before` words before it, or up to `after` words after it AND is followed within two words by a request verb (the window crosses a full stop on purpose). A plain 'nahin / not' negates only when a request verb follows it within two words ('payment nahin karni chahiye'), or when it follows 'zaroorat / need' ('karne ki zaroorat nahin hai'). So 'payment reflect nahin hua' (a demand) still counts. Known limit: a threat worded with a request verb ('payment nahin karna toh arrest') is read as a warning.",
+    "_about": "A payment or code keyword (stages S3 and S4, and the signals ask_otp, ask_credential, ask_install) does not count when the caller is warning against it: 'Payment karne ko bol sakte hain, aap aise mat kariyega' or 'OTP kisi ko mat bataiye'. This is a WINDOW, not a blanket rule. A prohibition word (mat, never, don't, do not, should not, no need) negates a keyword when it is up to `before` words before it, or up to `after` words after it AND is followed within two words by a request verb (the window crosses a full stop on purpose). A plain 'nahin / not' negates only when a request verb follows it within two words ('payment nahin karni chahiye'), or when it follows 'zaroorat / need' ('karne ki zaroorat nahin hai'). So 'payment reflect nahin hua' (a demand) still counts. A negated payment followed by 'toh' and a bad consequence ('payment nahin karna toh arrest ho jayega') is a THREAT and counts; a warning with a good or denied consequence ('... toh koi problem nahin hogi') stays a warning.",
     "before": 3,
     "after": 10,
     "prohibitions": ["mat", "मत", "never", "don t", "do not", "should not", "shouldn t", "no need", "dont", "मत"],
@@ -106,6 +106,12 @@
                       "करनी", "करना", "करने", "करें", "करे", "करिए", "करिये", "कीजिए", "कीजिये", "देना", "देनी", "दें", "दीजिए", "दीजिये",
                       "बताना", "बताएं", "बताएँ", "बताइए", "बताइये", "भेजना", "भेजनी", "भेजिए", "भेजिये", "भेजें", "चाहिए", "चाहिये",
                       "pay", "share", "send", "give", "tell", "provide", "transfer", "disclose", "required", "needed", "necessary"],
-    "bare_verbs": ["kar", "karo", "kariyega", "करिएगा", "kijiyega", "कीजिएगा", "कर", "करो", "देना", "dena"]
+    "bare_verbs": ["kar", "karo", "kariyega", "करिएगा", "kijiyega", "कीजिएगा", "कर", "करो", "देना", "dena"],
+    "conditional": ["toh", "to", "तो", "tab", "तब"],
+    "consequences": ["arrest", "arrested", "giraftar", "गिरफ्तार", "warrant", "वारंट", "jail", "जेल", "block", "blocked", "freeze", "frozen",
+                     "suspend", "suspended", "disconnect", "disconnected", "cut", "band", "bura", "बुरा", "nuksan", "नुकसान", "legal",
+                     "penalty", "seized", "challan", "fir", "court", "कोर्ट", "police", "पुलिस", "problem", "dikkat", "mushkil",
+                     "trouble", "anjaam", "bhugatna", "bhugtna", "sazaa", "saza"],
+    "consequence_window": 6
   }
 }

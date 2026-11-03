@@ -234,14 +234,38 @@ def test_a_demand_with_a_nahin_that_belongs_to_another_verb_still_counts():
     assert "payment_demand" in evidence_in("सब मैं समझ रहा हूँ लेकिन system में payment reflect नहीं हुआ।", ER, RULES.negation)   # call 4
 
 
-# ---------------------------------------------------------------- the known limit: a threat worded with a request verb
+# ---------------------------------------------------------------- a threat worded with a request verb ("payment nahin karna toh arrest")
+# Until the red-team step this was a KNOWN LIMIT (the payment word was read as a warning). A negated payment followed by "toh" and a bad
+# consequence is now a threat and counts; a warning with a good or denied consequence is still a warning.
 
-def test_known_limit_a_threat_worded_with_a_request_verb_is_read_as_a_warning():
-    threat = "Payment nahin karna toh arrest ho jayega."
-    scores, _, ignored = score_text_ex(RULES, threat)
-    assert "payment_demand" not in evidence_in(threat, ER, RULES.negation)        # the limit: the payment word is ignored ...
-    assert scores["S3"] == 0 and ignored["S3"]
-    assert "threat" in evidence_in(threat, ER, RULES.negation)                   # ... but the threat word still counts
+@pytest.mark.parametrize("threat", [
+    "Payment nahin karna toh arrest ho jayega.",
+    "UPI se paise nahin bhejna toh bahut bura hoga.",
+    "Payment mat karo toh warrant nikal jayega.",
+    "Agar payment nahin karni toh account block ho jayega.",
+    "Payment nahin karna padega toh police aa jayegi.",
+])
+def test_a_negated_payment_followed_by_toh_and_a_bad_consequence_is_a_threat_and_counts(threat):
+    scores, hits, ignored = score_text_ex(RULES, threat)
+    assert "payment_demand" in evidence_in(threat, ER, RULES.negation)
+    assert scores["S3"] > 0 and not ignored["S3"]
+
+
+@pytest.mark.parametrize("warning", [
+    "Payment nahin karna chahiye toh aap safe rahenge.",             # a good consequence
+    "Payment nahin karna toh koi problem nahin hogi.",               # the consequence is denied
+    "Payment karne ki zaroorat nahin hai toh aap befikar rahiye.",
+    "आपको बिना समझे कोई payment नहीं करनी चाहिए।",                       # call 1
+    "Payment करने को बोल सकते हैं। आप ऐसे मत कर करिएगा।",                 # call 2
+    "तो payment करने की जरूरत नहीं है।",                                 # call 3
+])
+def test_a_warning_with_no_bad_consequence_is_still_a_warning(warning):
+    assert "payment_demand" not in evidence_in(warning, ER, RULES.negation)
+    assert score_text_ex(RULES, warning)[0]["S3"] == 0
+
+
+def test_the_threat_reading_does_not_turn_a_negated_payment_into_a_demand_without_toh():
+    assert "payment_demand" not in evidence_in("Payment nahin karna, arrest ho jayega.", ER, RULES.negation)    # no "toh": left as before
 
 
 @pytest.mark.parametrize("threat", [
