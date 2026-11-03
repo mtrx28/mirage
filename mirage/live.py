@@ -38,7 +38,8 @@ TTS_ERRORS = (TimbreError, UngatedPlan, CreditLimitReached)
 
 def finding_dict(f) -> dict:
     return {"kind": f.kind, "value": f.value, "confidence": f.confidence, "valid": f.valid, "reason": f.reason,
-            "needs_confirmation": f.needs_confirmation, "quote": f.quote, "t": round(f.t, 2), "suggested": f.suggested}
+            "needs_confirmation": f.needs_confirmation, "quote": f.quote, "t": round(f.t, 2), "suggested": f.suggested,
+            "candidates": list(f.candidates)}
 
 
 class LiveCall(CallSession):

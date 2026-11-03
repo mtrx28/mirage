@@ -105,6 +105,8 @@ function renderIntel(findings) {
     badges.appendChild(el("span", f.valid ? "badge" : "badge bad", f.valid ? "valid format" : "not valid: " + f.reason));
     if (f.needs_confirmation) badges.appendChild(el("span", "badge bad", "needs confirmation"));
     card.appendChild(badges);
+    const maybe = (f.candidates && f.candidates.length) ? f.candidates : (f.suggested ? [f.suggested] : []);
+    if (f.kind === "vpa" && maybe.length) card.appendChild(el("div", "quote", "heard as above; a guess, not the value: maybe " + maybe.join(" or ")));
     card.appendChild(el("div", "quote", "“" + f.quote + "” at " + mmss(f.t)));
     els.intelCards.appendChild(card);
   }

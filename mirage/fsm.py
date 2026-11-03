@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Callable
 
 from mirage.config import ROOT, FSMConfig
-from mirage.extract import (DIGIT_KINDS_TIDY, Finding, Transcript, ends_with_digits, extract_intel, lone_digits, norm_word,
-                            redundant_copy, redundant_fragment, trailing_label)
+from mirage.extract import (DIGIT_KINDS_TIDY, Finding, Transcript, ends_with_digits, extract_intel, inside_vpa, lone_digits,
+                            norm_word, redundant_copy, redundant_fragment, trailing_label)
 from mirage.lines import Line, LineBank, SlotOption, load_lines, text_problems
 from mirage.negation import NO_NEGATION, Negation, counts as keyword_counts, load_negation, negated_by
 from mirage.persona import Persona, load_persona
@@ -540,9 +540,17 @@ class CallBrain:
             if f.kind == "ambiguous" and redundant_fragment(
                     f.value, [(g.kind, g.value) for k in DIGIT_KINDS_TIDY for g in intel.get(k, [])]):
                 continue                                   # a piece of a number we already hold
+            if inside_vpa(f, intel.get("vpa", [])):
+                continue                                   # the digits of a UPI id we already hold
             bucket = intel.setdefault(f.kind, [])
-            if all(f.value != g.value for g in bucket):
+            same = [i for i, g in enumerate(bucket) if f.value == g.value or (f.kind == "vpa" and f.value.lower() == g.value.lower())]
+            if not same:
                 bucket.append(f)
+            elif f.kind == "vpa" and f.value != bucket[same[0]].value:     # same UPI id, other spelling: keep the first, note the repeat
+                g = bucket[same[0]]
+                note = f"said again at {f.t:.1f} s as {f.value!r}"
+                if note not in g.reason:
+                    bucket[same[0]] = replace(g, reason="; ".join(filter(None, [g.reason, note])))
             if f.kind in DIGIT_KINDS_TIDY and "ambiguous" in intel:
                 # a number that contains an earlier unlabelled fragment replaces it
                 intel["ambiguous"] = [g for g in intel["ambiguous"]

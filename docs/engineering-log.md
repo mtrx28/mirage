@@ -1348,6 +1348,31 @@ before the hold rule, and the half-duplex mute cutting off a caller who began sp
    said slowly is the one most likely to be cut, and a high label on a short value is not a sign it is whole. Possible later directions, none started: a read-back that asks for the rest when
    a case number is shorter than usual, a spelling table that includes "छ", and not giving `keyword` confidence a "no need to confirm" for very short runs.
 
+## Rehearsal call: UPI id tidy-ups, and a wrong phone digit (3 Nov 2026; staged, one call, dev data)
+
+The owner's rehearsal call is `20261103_162757_6dd0` (9 turns). The UPI id was captured. Three things were tidied from its logged text (no service was called, E1 was not re-scored):
+
+1. **The same UPI id in another case is one card.** `verifyofficer123@okay` (88.1 s) and `Verifyofficer123@okay` (106.3 s) were two cards. Now a UPI id is compared without case; the first spelling is kept and the
+   repeat is written in its reason ("said again at 106.3 s as ..."). Numbers and letters are still compared exactly, and a plain repeat stays silent as before.
+2. **A leftover "123" inside a stored UPI id's quote is not a card of its own.** The call had an unlabelled `123` at 120.2 s (quote "one two three"). It is dropped when it is an unlabelled digit run, its
+   digits are in the name part of a stored UPI id, and its quote sits inside that id's quote. The same idea as the suffix duplicate for numbers. The live brain and the whole-call tidy both apply it.
+3. **"ok axis" heard as "okay".** The handle list in `config.py` is still small and marked UNVERIFIED (from memory; I added `ibl` and `axl`, also unverified). A heard handle that is not on it but starts with "ok" keeps its
+   heard value and `needs_confirmation`, and the likely handles are put in `candidates` (nearest first) and, only if one clearly shares more of its start with what was heard, in `suggested`. For this call: value
+   `verifyofficer123@okay`, suggested `verifyofficer123@okaxis`, candidates okaxis, oksbi, okicici, okhdfcbank. The dashboard card now says "a guess, not the value: maybe ..." and the evidence packet already prints
+   candidates and the suggestion. A near miss that does not start with "ok" gets no list (the older edit-distance guess still applies). The guess is a hint for the reader; nothing is read back to the caller from it.
+
+What the call also shows: the third spelling (turn 9: "Verify officer one two three", then "At", "Okay", "AXIX" as four separate pieces, about 1.2 to 2 s apart) was never stored as a UPI id; the caller's "ok axis" arrived as
+"Okay" and "AXIX". Not changed here.
+
+**Failure gallery candidate: a wrong digit with `keyword` confidence (not part of the E1 count).** The owner says the phone number ended 3 1 8 6 5 2. The logged transcript pieces read "0000", "तीन एक आठ।", "चार, पाँच, दो।",
+that is 3 1 8 4 5 2: Prisma wrote चार (four) where the owner says छह (six). The extractor stored `0000318452` as `phone`, confidence `keyword`, **no need to confirm**, exactly as the text reads, so it looks like a clean
+capture of the wrong number. This is the same shape as E16 (a plausible value with no warning). What was said is the owner's account; the audio was not re-checked. Not fixed; it is not part of the E1 count (the call was
+not one of the four E1 calls). A read-back of a 10-digit number would catch it only if the caller listens for each digit.
+
+Replay (offline, the logged transcripts turn by turn into a fresh brain, rules before this change against after): of the 11 calls in `data/calls/` (the five friend-session calls, the four E1 calls, the rehearsal call and
+one earlier call) only the rehearsal call's stored findings change (4 cards become 2: the two UPI cards become one, and the `123` card goes). The other ten are identical before and after. The replay does not reproduce the live stored findings exactly for
+three older calls (it does not know Uncle's earlier hints), so only the before/after difference is meaningful.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

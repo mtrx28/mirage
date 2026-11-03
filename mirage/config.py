@@ -42,7 +42,7 @@ MODELS: tuple[ModelBudget, ...] = (
 
 # UPI handles (the part after @) the extractor recognises. UNVERIFIED: I found no official NPCI list, so this is
 # deliberately small and comes from memory. A handle that is not here is not "wrong", just not recognised.
-KNOWN_UPI_PROVIDERS: frozenset[str] = frozenset({"ybl", "oksbi", "okhdfcbank", "okicici", "okaxis", "paytm"})
+KNOWN_UPI_PROVIDERS: frozenset[str] = frozenset({"ybl", "ibl", "axl", "oksbi", "okhdfcbank", "okicici", "okaxis", "paytm"})
 
 # Our own invented provider for the staged demo. Used ONLY when the extractor runs in synthetic mode.
 SYNTHETIC_UPI_PROVIDERS: frozenset[str] = frozenset({"mirageupi"})

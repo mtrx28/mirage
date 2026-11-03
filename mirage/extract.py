@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Sequence
 
 from mirage.config import KNOWN_UPI_PROVIDERS, SYNTHETIC_UPI_PROVIDERS
@@ -58,7 +58,7 @@ class Finding:
     t: float                           # arrival time of the first transcript it came from
     source_index: int                  # index of that transcript in the input list
     suggested: str | None = None       # a GUESS, kept apart from `value`
-    candidates: tuple[str, ...] = ()   # for kind "ambiguous": what it could be
+    candidates: tuple[str, ...] = ()   # for kind "ambiguous": what it could be; for "vpa": likely full ids if the handle was a near miss
 
 
 # --------------------------------------------------------------------------- validators (strings in, bool out)
@@ -435,11 +435,29 @@ def _suggest_provider(heard: list[str], providers: frozenset[str]) -> str | None
     return None
 
 
+def _shared_start(a: str, b: str) -> int:
+    return next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+
+
+def _near_miss_handles(heard: str, providers: frozenset[str]) -> list[str]:
+    """Known handles a heard-but-unknown handle may have been, when it starts with "ok" (Prisma wrote "okay" for "ok axis").
+    Nearest first: the longest shared start, then the smallest edit distance. Only a LIST OF GUESSES; the heard value is kept."""
+    h = heard.lower()
+    if not (h.isascii() and h.isalpha() and h.startswith("ok")):
+        return []
+    return sorted((t for t in providers if t.startswith("ok")), key=lambda t: (-_shared_start(h, t), _edit_distance(h, t), t))
+
+
 def _vpa_finding(toks, idxs, local: str, provider_raw: list[str], transcripts, synthetic_mode) -> Finding:
     providers = KNOWN_UPI_PROVIDERS | (SYNTHETIC_UPI_PROVIDERS if synthetic_mode else frozenset())
     value = f"{local}@{' '.join(provider_raw)}"
     known = provider_raw[0].lower() in providers and len(provider_raw) == 1
     suggestion = None if known else _suggest_provider(provider_raw, providers)
+    likely: list[str] = [] if known or len(provider_raw) != 1 else _near_miss_handles(provider_raw[0], providers)
+    if likely and suggestion is None:   # name one only if it shares clearly more of its start with what was heard than the next one
+        h = provider_raw[0].lower()
+        if len(likely) == 1 or _shared_start(h, likely[0]) > _shared_start(h, likely[1]):
+            suggestion = likely[0]
     valid = is_valid_vpa(value)
     reason = "" if valid else "not a valid UPI id as heard (a UPI id is plain ASCII: name@handle)"
     if valid and not known:
@@ -448,6 +466,7 @@ def _vpa_finding(toks, idxs, local: str, provider_raw: list[str], transcripts, s
         toks, idxs, transcripts, kind="vpa", value=value, valid=valid, reason=reason, confidence="heard",
         needs_confirmation=not (valid and known),
         suggested=f"{local}@{suggestion}" if suggestion else None,
+        candidates=tuple(f"{local}@{t}" for t in likely),
     )
 
 
@@ -550,6 +569,18 @@ def redundant_copy(f: Finding, others: Sequence[tuple[str, str]]) -> bool:
         k == f.kind and len(v) > len(f.value) and f.value in v for k, v in others)
 
 
+def _flat(text: str) -> str:
+    return " ".join(text.replace("|", " ").lower().split())
+
+
+def inside_vpa(f: Finding, vpas: Sequence[Finding]) -> bool:
+    """Is `f` an unlabelled digit run that is just the digits of a UPI id held already? Rehearsal call: "verify officer one two
+    three at okay" was stored as a UPI id, and the repeated "one two three" became a card of its own. True if `f` is "ambiguous",
+    its digits are in the local part of a stored UPI id, and its own quote sits inside that id's quote."""
+    return f.kind == "ambiguous" and bool(f.value) and any(
+        f.value in g.value.partition("@")[0] and _flat(f.quote) in _flat(g.quote) for g in vpas)
+
+
 LABEL_LOOKBACK = 3
 
 
@@ -581,17 +612,24 @@ def tidy_findings(findings: Sequence[Finding]) -> list[Finding]:
     2. an unlabelled digit run ("ambiguous") that is just a piece of a longer number found in the same list is dropped;
     3. a digit run that was NOT labelled by a keyword and is a piece of a longer number of the same kind is dropped.
     A DIFFERENT number is never merged: only an identical value, or a strict piece of a longer one."""
-    seen: set[tuple[str, str]] = set()
+    seen: dict[tuple[str, str], int] = {}
     unique: list[Finding] = []
     for f in findings:
-        if (f.kind, f.value) in seen:
+        key = (f.kind, f.value.lower() if f.kind == "vpa" else f.value)   # a UPI id is not case-sensitive
+        if key in seen:
+            first = unique[seen[key]]
+            if f.kind == "vpa" and f.value != first.value:   # same id, other spelling: keep the first, note the repeat
+                note = f"said again at {f.t:.1f} s as {f.value!r}"
+                unique[seen[key]] = replace(first, reason="; ".join(filter(None, [first.reason, note])))
             continue
-        seen.add((f.kind, f.value))
+        seen[key] = len(unique)
         unique.append(f)
+    vpas = [g for g in unique if g.kind == "vpa"]
     return [f for f in unique
             if not (f.kind == "ambiguous"
                     and redundant_fragment(f.value, [(g.kind, g.value) for g in unique if g is not f and g.kind in DIGIT_KINDS_TIDY]))
-            and not redundant_copy(f, [(g.kind, g.value) for g in unique if g is not f])]
+            and not redundant_copy(f, [(g.kind, g.value) for g in unique if g is not f])
+            and not inside_vpa(f, vpas)]
 
 
 # --------------------------------------------------------------------------- the top-level call
