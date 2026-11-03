@@ -383,9 +383,9 @@ def test_the_gate_lines_lint_catches_structure_problems():
         "disclose_emergency", "Main ek automated assistant hoon, insaan nahin. Ye call khatam ho rahi hai ji."))
 
 
-# ---------------------------------------------------------------- the scam score (provisional)
+# ---------------------------------------------------------------- the scam score (real evidence only; more in test_exit_rule.py)
 
-def test_the_scam_score_is_zero_at_the_start_grows_with_evidence_and_stays_capped():
+def test_the_scam_score_is_zero_at_the_start_grows_with_evidence_and_never_falls():
     state = CallState()
     assert scam_score(state, CFG) == 0
     brain = gated()
@@ -395,8 +395,9 @@ def test_the_scam_score_is_zero_at_the_start_grows_with_evidence_and_stays_cappe
         scores.append(scam_score(brain.state, CFG))
     assert scores == sorted(scores) and scores[-1] > scores[0] >= 0
     parts = scam_score_parts(brain.state, CFG)
-    assert set(parts) == {"stage", "payment_identifier", "case_number", "amount", "signals", "words", "scenario"}
-    assert parts["signals"] <= CFG.signal_points_cap and parts["words"] <= CFG.word_points_cap
+    assert set(parts) == {"authority", "threat", "pressure", "secrecy", "credential_ask", "payment_demand", "install_or_link",
+                          "payment_identifier", "case_number", "amount"}
+    assert scam_score(brain.state, CFG) == sum(parts.values()) <= sum(p for _, p in CFG.evidence_points) + 2.0 + 1.0 + 0.5
 
 
 def test_gate_decisions_do_not_depend_on_the_language_model_or_the_network():

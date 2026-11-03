@@ -89,16 +89,19 @@ class GateConfig:
     emergency_number: str = "112"          # India's single emergency number: secondary sources only, UNVERIFIED (see log)
     # reply limits (a digit read-back is longer than a template line)
     max_reply_chars: int = 200
-    # the scam score, used to decide how much scam evidence a call has so far (points, capped; all guesses)
-    stage_points: tuple[float, ...] = (0.0, 1.0, 1.5, 3.0, 3.5, 3.5)   # by the highest stage reached, S0 to S5
-    payment_identifier_points: float = 2.0
+    # the scam score: points for REAL evidence only, each category once per call (see content/gate_rules.json "evidence").
+    # All guesses; calibrated on 10 scripts from one friend (dev data), see docs/engineering-log.md.
+    evidence_points: tuple[tuple[str, float], ...] = (
+        ("authority", 1.0), ("threat", 1.0), ("pressure", 1.0), ("secrecy", 1.5),
+        ("credential_ask", 2.0), ("payment_demand", 2.0), ("install_or_link", 2.0),
+    )
+    payment_identifier_points: float = 2.0   # the caller gave a UPI id, an account number or an IFSC code
     case_number_points: float = 1.0
     amount_points: float = 0.5
-    signal_points: float = 1.0             # per distinct ask: OTP, install, credential
-    signal_points_cap: float = 3.0
-    word_points: float = 0.25              # per distinct authority or urgency keyword
-    word_points_cap: float = 1.5
-    scenario_points: float = 0.5           # once a scenario (digital arrest, bank KYC) is decided
+    # the exit rule: a call that still shows little evidence after a grace period ends politely, with the honest line
+    exit_enabled: bool = True
+    exit_grace_turns: int = 8              # GUESS: the caller's first N turns never lead to an exit, whatever the score
+    exit_score_below: float = 1.0          # GUESS: the middle of the gap on the 10 friend scripts (benign 0.0, lowest scam 2.0); under this, after the grace, exit
 
 
 @dataclass(frozen=True)

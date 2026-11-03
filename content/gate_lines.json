@@ -18,6 +18,13 @@
         "Sach batata hoon, main ek automated assistant hoon, insaan nahin. Ye call ab yahin khatam hoti hai."
       ]
     },
+    "exit_polite": {
+      "end_call": true,
+      "variants": [
+        "Maaf kijiye, main ek automated assistant hoon, insaan nahin. Baat karne ka shukriya, ye call ab khatam karta hoon.",
+        "Shukriya ji. Sach batata hoon, main ek automated assistant hoon, asli insaan nahin. Ye call ab yahin khatam hoti hai."
+      ]
+    },
     "disclose_emergency": {
       "end_call": true,
       "variants": [

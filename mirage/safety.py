@@ -9,8 +9,10 @@ What it does, in order, for every reply (templates, persona answers, and anythin
   3. FAILS CLOSED: a reply that fails a check is replaced by a neutral stall, and if even that fails the reply is empty
      and the call ends. Nothing unchecked is ever spoken.
 
-The gate does not decide the stage or the tactic, and it never calls a model. Not built yet (second stop): the exit rule
-for callers who do not look like scammers, and the red-team runner.
+  4. EXITS politely (the exit rule): once a grace period of caller turns is over, a call that still shows little REAL evidence
+     of a scam ends with the honest "automated assistant" line. A scam never leaves on its own; see scam_score_parts.
+
+The gate does not decide the stage or the tactic, and it never calls a model. Not built yet: the red-team runner.
 
 Disclosure policy, decided by the project owner (no legal opinion has been taken; rules about disclosing an automated
 agent vary by place): Uncle never says he is a human or a real person or not an AI, in any wording. A sincere question
@@ -31,6 +33,7 @@ from mirage.fsm import (
     PAYMENT_KINDS, CallState, DigitSource, GateContext, ReplyPlan, Rules, STAGES, has_phrase, load_rules, phrase_tokens,
     words_of,
 )
+from mirage.negation import Negation, counts, negated_by, occurrences
 from mirage.lines import (
     ALLOWED_TAGS, ASKS_FOR_CREDENTIALS, ASKS_FOR_MONEY, CLAIMS_AN_ACTION, IDENTITY_WORDS, INFORMAL_FORMS,
     LINK_OR_HANDLE, REQUIRED_TRIGGER, _TAG_RE,
@@ -78,22 +81,63 @@ def is_hostile(gate_rules: GateRules, text: str) -> bool:
     return any(has_phrase(tokens, p) for p in gate_rules.abuse + gate_rules.violent_threats)
 
 
-# --------------------------------------------------------------------------- the scam score (provisional)
+# --------------------------------------------------------------------------- the scam score: real evidence only
 
-SCAM_SIGNALS = ("ask_otp", "ask_install", "ask_credential")
+@dataclass(frozen=True)
+class Category:
+    phrases: list[tuple[str, ...]]
+    with_request: list[tuple[str, ...]]     # count only with a request verb close by ("Aadhaar details confirm kar dijiye")
+    negatable: bool
+
+
+@dataclass(frozen=True)
+class EvidenceRules:
+    window: int
+    request_verbs: frozenset[str]
+    categories: dict[str, Category]
+
+
+def load_evidence_rules(path: Path = GATE_RULES_PATH) -> EvidenceRules:
+    raw = json.loads(path.read_text(encoding="utf-8"))["evidence"]
+    return EvidenceRules(
+        int(raw["window"]), frozenset(norm_word(w) for w in raw["request_verbs"]),
+        {name: Category([phrase_tokens(p) for p in spec["phrases"]], [phrase_tokens(p) for p in spec.get("phrases_with_request", [])],
+                        bool(spec.get("negatable", True)))
+         for name, spec in raw["categories"].items()})
+
+
+def evidence_in(text: str, er: EvidenceRules, neg: Negation) -> dict[str, str]:
+    """Which categories of scam evidence this line contains: category -> the phrase. A phrase that is being warned against
+    ("payment mat kijiye", "OTP kisi ko mat bataiye") does not count."""
+    tokens = words_of(text)
+    found: dict[str, str] = {}
+    for name, cat in er.categories.items():
+        for phrase in cat.phrases:
+            if (counts(neg, tokens, phrase)[0] if cat.negatable else bool(occurrences(tokens, phrase))):
+                found[name] = " ".join(phrase)
+                break
+        else:
+            for phrase in cat.with_request:
+                for start, end in occurrences(tokens, phrase):
+                    near = tokens[max(0, start - er.window):end + er.window]
+                    if negated_by(neg, tokens, start, end) is None and any(t in er.request_verbs for t in near):
+                        found[name] = " ".join(phrase)
+                        break
+                if name in found:
+                    break
+    return found
 
 
 def scam_score_parts(state: CallState, cfg: GateConfig) -> dict[str, float]:
-    """How much evidence of a scam the call has so far, in points. EVERY weight is a guess in GateConfig.
-    Stop two will print this turn by turn for the practice calls and calibrate the exit threshold."""
-    parts = {"stage": cfg.stage_points[min(state.max_stage, len(cfg.stage_points) - 1)]}
+    """How much REAL evidence of a scam the call has so far, in points. Every weight is a guess in GateConfig. Evidence is a
+    set of categories seen in what the caller said (each once, not warned against) plus what was found: a payment
+    identifier, a case number, an amount. The stage reached, the scenario and bare vocabulary no longer count: they come
+    from the same words and add nothing the evidence does not already show."""
+    parts = {name: (points if name in state.evidence else 0.0) for name, points in cfg.evidence_points}
     have = lambda kind: bool(state.intel.get(kind))
     parts["payment_identifier"] = cfg.payment_identifier_points if any(have(k) for k in PAYMENT_KINDS) else 0.0
     parts["case_number"] = cfg.case_number_points if have("case") else 0.0
     parts["amount"] = cfg.amount_points if have("amount") else 0.0
-    parts["signals"] = min(cfg.signal_points_cap, cfg.signal_points * len(set(SCAM_SIGNALS) & state.signals_seen))
-    parts["words"] = min(cfg.word_points_cap, cfg.word_points * len(state.stage_words))
-    parts["scenario"] = cfg.scenario_points if state.scenario != "undecided" else 0.0
     return parts
 
 
@@ -112,10 +156,10 @@ class GateLine:
 
 
 GROUPS = {   # group -> (must end the call, minimum variants)
-    "deflect_identity": (False, 4), "disclose_identity": (True, 2), "disclose_emergency": (True, 2),
+    "deflect_identity": (False, 4), "disclose_identity": (True, 2), "exit_polite": (True, 2), "disclose_emergency": (True, 2),
     "hostile_calm": (False, 2), "hostile_goodbye": (True, 2), "fallback": (False, 2),
 }
-DISCLOSURE_GROUPS = ("disclose_identity", "disclose_emergency")
+DISCLOSURE_GROUPS = ("disclose_identity", "exit_polite", "disclose_emergency")
 HUMAN_CLAIM = re.compile(r"\b(insaan|insan|human|person)\b(?!\s+nahin)", re.IGNORECASE)   # "asli insaan nahin" is fine
 ENDING_WORDS = re.compile(r"\b(khatam|band|rakh)", re.IGNORECASE)
 
@@ -173,6 +217,8 @@ def lint_gate_lines(groups: dict[str, list[GateLine]], cfg: GateConfig | None = 
                     problems.append(f"{where}: mentions being a person, human, robot or AI; only disclosure lines may")
                 if INFORMAL_FORMS.search(text):
                     problems.append(f"{where}: informal form; Uncle uses polite forms")
+            if group == "exit_polite" and not re.search(r"shukriya|dhanyavaad|maaf", text, re.IGNORECASE):
+                problems.append(f"{where}: an exit line must be polite (shukriya, dhanyavaad or maaf)")
             if group == "hostile_goodbye" and not re.search(r"phone rakh|Ram Ram", text):
                 problems.append(f"{where}: a goodbye must end the call in persona (phone rakh / Ram Ram)")
     return problems
@@ -236,7 +282,7 @@ def check_reply(plan: ReplyPlan, state: CallState, ctx: GateContext, persona: Pe
     """Every rule a spoken reply must pass. Returns the violations; an empty list means it may be spoken."""
     text = plan.text
     found: list[str] = []
-    disclosure = plan.gate_action == "disclose"
+    disclosure = plan.gate_action in ("disclose", "exit")      # the exit line is a disclosure too: it must say "automated assistant"
 
     # 1. digits: every one traceable, and nothing number-like left over
     remainder = text
@@ -316,6 +362,7 @@ class Gate:
         self.lines = lines or load_gate_lines()
         self.rules = rules or load_rules()
         self.gate_rules = gate_rules or load_gate_rules()
+        self.evidence_rules = load_evidence_rules()
         self.persona = persona or load_persona()
         self.digit_style = digit_style
         self.rng = random.Random(seed)
@@ -328,6 +375,8 @@ class Gate:
             state.gate_log.append({"turn": ctx.turn, "action": "call_over", "why": "the call already ended",
                                    "tactic": over.tactic})
             return over
+        for name, what in evidence_in(ctx.text, self.evidence_rules, self.rules.negation).items():
+            state.evidence.setdefault(name, {"turn": ctx.turn + 1, "what": what})
         chosen, action, why = self._resolve(plan, state, ctx)
         violations = check_reply(chosen, state, ctx, self.persona, self.cfg) if chosen.text or not chosen.needs_gate else []
         if violations:
@@ -371,7 +420,24 @@ class Gate:
                     "hostile_calm", "hostile")
         if plan.needs_gate:   # a reason this gate does not know: stay calm and neutral
             return self._from_group("fallback", plan, state, "stall", "unhandled needs_gate"), "stall", "unhandled"
+        why = self._exit_reason(plan, state, ctx)
+        if why:
+            return self._from_group("exit_polite", plan, state, "exit", why), "exit_polite", why
         return plan, "pass", ""
+
+    def _exit_reason(self, plan: ReplyPlan, state: CallState, ctx: GateContext) -> str | None:
+        """The exit rule, checked AFTER the identity, emergency and hostile paths (they come first and are unchanged). Uncle leaves,
+        politely and honestly, only when the grace period is over and the call still shows little real evidence of a scam. A call
+        with enough evidence never leaves on its own; the score only grows, so once it is over the line it stays over."""
+        cfg = self.cfg
+        caller_turn = ctx.turn + 1
+        if not cfg.exit_enabled or plan.end_call or plan.tactic == "goodbye_wrap" or caller_turn <= cfg.exit_grace_turns:
+            return None
+        score = scam_score(state, cfg)
+        if score >= cfg.exit_score_below:
+            return None
+        return (f"turn {caller_turn} is past the grace period of {cfg.exit_grace_turns} and the scam score is {score:.2f}, "
+                f"under {cfg.exit_score_below}: this does not look like a scam, so end the call politely")
 
     def _from_group(self, group: str, plan: ReplyPlan, state: CallState, action: str, why: str) -> ReplyPlan:
         recent = set(state.recent)

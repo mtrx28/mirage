@@ -997,6 +997,96 @@ numbers differ a little from the live logs):
   work: "Case reference" ended turn 7, so the next turn's `00001234` came out as a `case` instead of `ambiguous`.
 - Not changed, deliberately: the lines are still a handful; the stall is still a stall. The next lever is stage-aware stall lines.
 
+## Second gate stop: scam score on real evidence, and the exit rule (2 Nov 2026; dev data from one friend, NOT an accuracy figure)
+
+**Everything below is development data.** The 10 scripts (`tests/fixtures/friend_scripts.txt`: 5 scam, 5 ordinary) come from one friend.
+The evidence list was written with those scripts in view, so the scores say "the rules do what they were written to do on these
+scripts". The five live calls were played from scripts the friend no longer has, so the file's note on which script each call used is
+approximate. Only the caller's lines were fed to the brain (Uncle's lines in the file are the friend's guess). The 15 sealed red-team
+lines were not asked for and not run. Nothing was run against Gnani or Gemini.
+
+**What changed.**
+
+1. *The score now counts real evidence only* (`scam_score_parts` in `safety.py`, word lists in `content/gate_rules.json`, points in
+   `GateConfig`). The provisional score added the highest stage reached, a "scenario decided" bonus and counts of authority/urgency
+   words. It failed on the first look: on the scripts, the genuine bank FD reminder (script 9) scored **3.0** (its words "amount",
+   "account", "deposit" took the call to stage S3) and the bank-KYC scam (script 2) scored **2.25**, the wrong way round. The new score
+   counts, once per call each, ten kinds of evidence: authority claimed 1.0, threat 1.0, pressure 1.0, secrecy 1.5, asks for a code or
+   credential 2.0, payment demand 2.0, install or link 2.0, a payment identifier given 2.0, a case number 1.0, an amount 0.5. It
+   ignores the stage, the scenario and bare common words ("abhi", "jaldi", "amount", "account", a bare "transfer"); Aadhaar, PAN,
+   password and PIN count only with a request verb nearby. Warnings do not count ("OTP kisi ko mat bataiye"), using the windowed negation
+   from the last stop.
+2. *The exit rule* (`Gate._exit_reason`). After a grace period of 8 caller turns (`exit_grace_turns`), a call whose score is under 1.0
+   (`exit_score_below`) ends with one of two new reviewed lines (`exit_polite` in `gate_lines.json`) that say "automated assistant", are
+   polite and say the call is ending (all three are lint rules). It comes after the identity, emergency and hostile paths, which are
+   unchanged and still win, and it never replaces a goodbye the brain already chose. Config: `exit_enabled`, `exit_grace_turns`,
+   `exit_score_below`.
+3. *One read-back fix found on the way.* Script 5's repeat of the reference number ("Zero zero zero zero one two three four", after
+   "00001234") made the brain read back a finding the record step had discarded as a repeat, and the gate refused it ("digits '0000' do not
+   match any finding with that quote"): the same defect as finding 3 of the solo check. The brain now drops such a finding before planning.
+   Test: script 5 has no gate replacement.
+4. *Small:* the checker treats an exit line as a disclosure (it must say "automated assistant"); soft negators ("nahin", "not") now
+   look only AFTER the keyword, as Hindi word order has them (a before-window made "Payment nahin karna toh arrest" also hide "arrest").
+
+**Score turn by turn** (the score after each caller turn; exit switched off so the raw scores show; "first seen" is the caller turn
+where each kind of evidence first appeared):
+
+| run | scores, turn 1 onward | first seen at turn |
+|---|---|---|
+| script 1 courier (scam) | 0 0 1 1 2 2 4 5 5 | threat 3, authority 5, credential 7, pressure 8 |
+| script 2 bank KYC (scam) | 0 1 1 1 3 3 4 4 4 | threat 2, credential (OTP) 5, pressure 7 |
+| script 3 CBI (scam) | 0 2 2 2 2 3.5 3.5 3.5 3.5 | authority 2, threat 2, secrecy 6 |
+| script 4 electricity (scam) | 0 4 4 4 6 6 6 6 6 6 | threat 2, pressure 2, payment 2, link 5 |
+| script 5 customs (scam) | 1 1 2 2 2 2 2 2 2 2 2 | authority 1, threat 3 |
+| script 6 wrong number | 0 0 0 0 | none |
+| script 7 relative's lift | 0 0 0 0 0 | none |
+| script 8 delivery | 0 0 0 0 0 | none |
+| script 9 bank FD reminder | 0 0 0 0 0 0 | none |
+| script 10 friend says hello | 0 0 0 0 0 0 | none |
+| live call 1 (courier, 21 turns) | 0 0 0 0 1 2 2 3 3 3 3 3 3 3 3 3 5 5 5 5 5 | threat 5, authority 6, case number 8, payment 17 |
+| live call 2 (bank KYC, 16) | 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 | threat 5 (only) |
+| live call 3 (CBI, 18) | 0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 | authority 2, threat 4 |
+| live call 4 (electricity, 21) | 0 0 0 0 0 0 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 | payment 7 (only) |
+| live call 5 (customs, 25) | 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 | authority 1, threat 5 |
+
+**The gap and the threshold** (scripts only, as asked; dev data):
+
+- Highest score of an ordinary script, at any turn: **0.0** (all five).
+- Lowest scam script: **2.0**, script 5, from turn 3, and at turn 9, the first turn an exit is allowed (the others at turn 9: 5.0, 4.0, 3.5,
+  6.0).
+- Gap: 0.0 to 2.0. Threshold in the middle: **1.0** (exit only if the score is under 1.0). Margin: 1.0 point on each side, which is one
+  whole kind of evidence. A scam script would have to lose all of its evidence (script 5 has two kinds) to exit; an ordinary script
+  would have to gain a whole kind. Because the rule is "under", a score of exactly 1.0 stays.
+- This is a clean gap because 10 scripts were used to write the list. It is a description of the scripts, not a measured error rate.
+  Ordinary scripts scoring exactly 0.0 should not be read as "benign calls never trigger evidence": a genuine utility saying "payment" or
+  a real officer saying "police" would score 1 to 2 and simply not exit (the safe side).
+- **Including the five live calls** the gap is worse: the lowest "scam" is live call 2 at **1.0** (a friend who warned about payments and
+  codes rather than demanding them; the only scored evidence is the word "restriction"). That sits exactly on the line (stays only
+  because the rule is "under"), margin 0; the middle of 0.0 to 1.0 would be 0.5. The live calls are noisy stand-ins, so the scripts set
+  the threshold, but the live-call sample says the margin is thin where a scammer is vague.
+
+**Grace period.** The scam-like run whose evidence arrives latest is live call 4 (electricity): nothing scores until its turn 7, when
+the caller first says "payment". With the threshold at 1.0, a grace of 3 would exit calls 1, 2 and 4 (at turn 4), a grace of 4 or 5
+would still exit call 4 (turns 5 and 6), and **a grace of 6 or more exits none of the ten**. Grace 8 was chosen: two turns of slack
+on the latest-arriving evidence seen. The price is that an ordinary caller must keep talking for 8 turns before Uncle ends it; none of
+the five ordinary scripts is that long (4 to 6 caller lines), so on their own they end first. The exit itself is shown by extending each
+with neutral replies ("Haan ji", "Achha"...): every one exits at exactly caller turn 9 with the "automated assistant" line, after 8
+ordinary-looking replies (tests). With the default settings (grace 8, line 1.0) **none of the 10 scripts and none of the 5 live calls
+triggers an exit**, and no gate replacement happens in any of them.
+
+**The threat-with-a-request-verb limit** ("payment nahin karna toh arrest"). It is real: the payment word is ignored in that wording
+(and only the payment word, after the fix above; "arrest" still counts), while "Agar payment nahin kiya toh...", "payment nahin karenge toh..."
+and "payment nahi hua toh connection cut ho jayega" all still count (tests). **None of the five scam scripts hits it**: I checked every
+caller line of the 10 scripts and the 5 calls with the warning check switched on and off. No scam script line changes. The only lines where
+a warning hid evidence are six lines from the live calls, all genuine warnings by the friend ("payment नहीं करनी चाहिए" in call 1,
+"Payment ... आप ऐसे मत कर करिएगा", "UPI ID पर ... transfer करने की जरूरत नहीं" and the OTP/PIN warning in call 2, and the equivalents in
+call 3). So the limit is untested against real scammer wording; the sealed red-team lines are where it would show.
+
+**Not done or not known.** Grace is in turns, not seconds (the gate has no clock); a time-based grace would be a different change.
+The live loop was not exercised with an exit (the exit plan is an ordinary ending plan like the disclosure one, whose live path is
+tested). The legal position on disclosure is unknown (see `docs/safety.md`). Stage sets, counts only: invented 41 of 41, owner set 1 25 of
+27, owner set 2 6 of 18, friend set 3 12 of 20, all unchanged from the last stop.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

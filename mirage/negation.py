@@ -62,7 +62,7 @@ def negated_by(neg: Negation, tokens: list[str], start: int, end: int) -> str | 
                 last = i + len(p) - 1
                 if before_it or followed_by(last, GUARD_SPAN, neg.request_verbs | neg.bare_verbs):
                     return " ".join(p)
-        if tokens[i] in neg.soft:
+        if tokens[i] in neg.soft and not before_it:       # "nahin" follows what it negates in Hindi: only look after the keyword
             if followed_by(i, GUARD_SPAN, neg.request_verbs) or (i > 0 and tokens[i - 1] in neg.need_words):
                 return tokens[i]
     return None

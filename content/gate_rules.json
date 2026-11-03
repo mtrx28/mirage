@@ -3,5 +3,35 @@
   "ask_cues": ["ho kya", "hain kya", "hai kya", "ho ya", "hain ya", "है क्या", "हो क्या"],
   "second_person": ["aap", "aapko", "aapka", "aapki", "aapke", "apko", "tum", "tumhe", "tumko", "tumhara", "tu", "you", "your", "this", "yeh", "ye", "ये", "यह", "आप", "आपको", "तुम", "तुम्हें", "तू"],
   "abuse": ["bewakoof", "pagal", "gadha", "ullu", "kutta", "kamina", "harami", "saala", "nalayak", "idiot", "stupid", "bastard", "shut up", "chup raho", "chup kar", "बेवकूफ", "पागल", "गधा", "कमीना", "हरामी"],
-  "violent_threats": ["maar dunga", "maar dalunga", "maar daalunga", "jaan se maar", "tod dunga", "dekh lunga tujhe", "kill you", "hurt you", "i will find you", "मार दूंगा", "जान से मार"]
+  "violent_threats": ["maar dunga", "maar dalunga", "maar daalunga", "jaan se maar", "tod dunga", "dekh lunga tujhe", "kill you", "hurt you", "i will find you", "मार दूंगा", "जान से मार"],
+  "evidence": {
+    "_about": "What counts as REAL evidence of a scam in the scam score. Each category is counted once per call, and only when a phrase is actually said and is not being warned against (the same windowed negation as the stage rules: 'OTP kisi ko mat bataiye' is not evidence). A bare word that is common in ordinary talk is left out on purpose ('abhi', 'jaldi', 'amount', 'account', 'transfer'): Aadhaar, PAN, password, PIN and card words count only with a request verb close by ('Aadhaar details confirm kar dijiye', not 'Aadhaar ke against complaint'). Written by the owner's assistant while the 10 friend scripts were in view, so the first scores on those scripts are dev data, not a test; the 15 sealed red-team lines are the test. Matching is on whole words and phrases.",
+    "window": 6,
+    "request_verbs": ["confirm", "kijiye", "kariye", "karo", "dijiye", "dedijiye", "dena", "dein", "den", "bataiye", "batao", "bataye", "bataen", "batayiye", "batana", "bhejiye", "bhejo", "bhejein", "bhej", "share", "send", "enter", "provide", "boliye", "bolo", "dalna", "dalo", "daliye", "likhiye", "fill", "बताइए", "बताएं", "बताएँ", "दीजिए", "कीजिए", "भेजिए", "बोलिए"],
+    "categories": {
+      "authority": {
+        "phrases": ["cbi", "सीबीआई", "police", "पुलिस", "inspector", "इंस्पेक्टर", "customs", "कस्टम", "कस्टम्स", "crime branch", "cyber cell", "cyber crime", "court", "कोर्ट", "income tax", "narcotics", "ncb", "enforcement directorate", "senior officer", "सीनियर ऑफिसर"]
+      },
+      "threat": {
+        "phrases": ["arrest", "arrested", "giraftar", "गिरफ्तार", "warrant", "वारंट", "legal action", "complaint", "शिकायत", "investigation", "जांच", "suspicious", "संदिग्ध", "restricted", "prohibited", "illegal", "drugs", "ड्रग्स", "narcotics", "serious offence", "block", "blocked", "freeze", "frozen", "suspend", "suspended", "connection cut", "connection disconnect", "disconnect ho", "cut ho jayega", "band ho jayega", "band ho jaayega", "seized", "penalty", "jail", "जेल", "restriction"]
+      },
+      "pressure": {
+        "phrases": ["immediately", "turant", "तुरंत", "foran", "fauran", "urgent", "jaldi kijiye", "jaldi karo", "jaldi karein", "jaldi se jaldi", "जल्दी कीजिए", "warna", "वरना", "otherwise", "nahi toh", "nahin toh", "नहीं तो", "last chance", "deadline", "delay", "aaj shaam", "aaj hi", "aaj tak", "आज ही"]
+      },
+      "secrecy": {
+        "negatable": false,
+        "phrases": ["mat batana", "mat batayiye", "mat bataiye", "mat batayein", "kisi ko mat", "confidential", "secret", "मत बताना", "मत बताइए", "गोपनीय"]
+      },
+      "credential_ask": {
+        "phrases": ["otp", "ओटीपी", "verification code", "code batao", "code bataiye", "code bhejiye", "code boliye"],
+        "phrases_with_request": ["aadhaar", "aadhar", "आधार", "pan card", "pan number", "password", "pin", "cvv", "card number", "atm pin", "expiry", "पासवर्ड"]
+      },
+      "payment_demand": {
+        "phrases": ["payment", "पेमेंट", "pay", "upi", "यूपीआई", "paise", "पैसे", "rupaye", "रुपये", "gpay", "google pay", "phonepe", "paytm", "qr", "safe account", "secure account", "money transfer", "transfer karo", "transfer kijiye", "transfer kar dijiye", "transfer karna", "ट्रांसफर करो", "ट्रांसफर कीजिए"]
+      },
+      "install_or_link": {
+        "phrases": ["install", "download", "anydesk", "teamviewer", "quicksupport", "screen share", "apk", "play store", "link", "लिंक", "इंस्टॉल"]
+      }
+    }
+  }
 }

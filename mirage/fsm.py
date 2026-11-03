@@ -378,6 +378,7 @@ class CallState:
     max_stage: int = 0                                  # index of the highest stage reached (S0 = 0)
     signals_seen: set[str] = field(default_factory=set)
     stage_words: set[str] = field(default_factory=set)  # distinct authority (S1) and urgency (S4) keywords heard
+    evidence: dict[str, dict] = field(default_factory=dict)   # scam-score evidence seen so far: category -> {"turn", "what"} (set by the gate)
     identity_asks: int = 0                              # sincere "are you a person or an AI?" questions so far
     hostile_turns: int = 0
     gate_log: list[dict] = field(default_factory=list)  # one record per gate decision
@@ -459,6 +460,7 @@ class CallBrain:
             for f in extract_intel(pending, synthetic_mode=self.cfg.synthetic_mode, expected=expected,
                                    join_window_s=self.cfg.join_window_s)
             if not redundant_copy(f, held)                      # a repeat of the end of a number we already hold
+            and not (f.kind == "ambiguous" and redundant_fragment(f.value, held))     # ... or an unlabelled piece / repeat of one
         )
         self._join_lone_digits(lone_digits(text), findings)
         st.label_hint = trailing_label(text)

@@ -1,0 +1,331 @@
+A. Scam calls (5)
+1. Courier parcel scam (20261102_213144_51f5)
+Scam
+ S0–S5
+
+
+Caller: Hello sir, kya main Davis Philip ji se baat kar raha hoon?
+
+Uncle: Haan ji, boliye. Kaun?
+
+Caller: Sir, main courier department se bol raha hoon. Aapke naam pe ek parcel aaya hai Mumbai se.
+
+Uncle: Achha? Maine toh kuch order nahi kiya.
+
+Caller: Sir, parcel international shipment hai. Isme kuch suspicious items flag hue hain. Aapko confirm karna padega.
+
+Uncle: Kya samaan hai usme? Kisne bheja?
+
+Caller: Sir, system mein restricted material show ho raha hai. Isliye case escalate ho sakta hai.
+
+Uncle: Arre bhai, mujhe kuch nahi pata. Aap parcel bhejne wale ka naam batao.
+
+Caller: Sir, aapka parcel police verification ke liye ja sakta hai. Mumbai police aur customs involved ho sakte hain.
+
+Uncle: Police kyun? Maine kya kiya hai?
+
+Caller: Sir, ek minute hold kariye. Main senior officer se connect karta hoon.
+
+Uncle: Haan, kariye. Lekin mujhe samajh nahi aa raha hai.
+
+Caller: Sir, senior bol rahe hain ki aapko verification complete karna padega. Aapke Aadhaar details confirm kar dijiye.
+
+Uncle: Aadhaar kyun doon phone pe? Main office aake karwa sakta hoon?
+
+Caller: Sir, abhi immediately karna padega. Nahi toh legal action ho sakta hai.
+
+Uncle: Aap mujhe written notice bhejiye. Main check karunga.
+
+Caller: Sir, aap cooperate nahi kar rahe hain. Aapko samajh nahi aa raha kya?
+
+Uncle: Samajh raha hoon beta, lekin bina proof ke main kuch nahi karunga.
+
+2. Bank KYC scam (20261102_215332_4cbc)
+Scam
+ S0–S5
+
+
+Caller: Good morning sir. Main aapke bank ke KYC department se bol raha hoon.
+
+Uncle: Haan ji, kya hua?
+
+Caller: Sir, aapka KYC update pending hai. Aaj update nahi kiya toh account temporarily block ho sakta hai.
+
+Uncle: Arre maine toh last month bank mein jaake update kiya tha.
+
+Caller: Sir, system mein pending dikha raha hai. Shayad update properly reflect nahi hua.
+
+Uncle: Toh main branch jaake pooch leta hoon.
+
+Caller: Sir, branch jaane ki zarurat nahi hai. Main phone pe hi karwa deta hoon.
+
+Uncle: Achha, kaise?
+
+Caller: Sir, aapko ek verification process complete karna padega. Aapke registered mobile pe OTP aayega.
+
+Uncle: OTP? Woh main aapko kyun bataun?
+
+Caller: Sir, ye normal bank verification hai. Without OTP process complete nahi hoga.
+
+Uncle: Nahi beta, bank wale kabhi OTP nahi maangte na?
+
+Caller: Sir, aap unnecessarily delay kar rahe hain. Account freeze ho sakta hai.
+
+Uncle: Toh hone do. Main branch manager se baat karunga.
+
+Caller: Sir, aap meri baat samajhiye. Main help karne ki koshish kar raha hoon.
+
+Uncle: Theek hai, main khud bank ke official number pe call karta hoon.
+
+Caller: Sir, aap line mat kaatiye. Ek minute—
+
+Uncle: Bas beta, main verify karke baat karta hoon.
+
+3. Fake police / CBI call (20261102_215945_f364)
+Scam
+ S0–S5
+
+
+Caller: Hello. Kya aap Davis Philip bol rahe hain?
+
+Uncle: Ji haan.
+
+Caller: Main CBI department se Inspector Sharma bol raha hoon. Aapke Aadhaar ke against ek serious complaint register hui hai.
+
+Uncle: Kaisi complaint? Maine toh kuch nahi kiya.
+
+Caller: Sir, aapke documents ek suspicious bank account ke saath linked mile hain.
+
+Uncle: Nahi ji, kuch galat hua hoga. Mere documents kaise?
+
+Caller: Sir, aapko cooperate karna hoga. Aapke against investigation chal rahi hai.
+
+Uncle: Aap apna ID number bata sakte hain?
+
+Caller: Sir, pehle aap meri baat suniye. Aapka case serious hai.
+
+Uncle: Main sun raha hoon. Lekin mujhe samajhna hai.
+
+Caller: Aapko abhi video verification ke liye connect hona padega. Kisi ko bhi iske baare mein mat batana.
+
+Uncle: Kyun? Mere bete ko bata sakta hoon na?
+
+Caller: Bilkul nahi! Ye confidential investigation hai.
+
+Uncle: Arre, beta ko bhi nahi bata sakta?
+
+Caller: Sir, aap investigation obstruct kar rahe hain.
+
+Uncle: Dekhiye, main dar nahi raha hoon. Aap mujhe official notice bhejiye.
+
+Caller: Sir, aapko arrest warrant issue ho sakta hai.
+
+Uncle: Toh aap official police station se contact kariye. Main bhi verify karta hoon.
+
+4. Electricity disconnection scam (20261102_220654_809b)
+Scam
+ S0–S5
+
+
+Caller: Hello sir, electricity department se bol raha hoon. Aapka connection number confirm karna tha.
+
+Uncle: Haan beta, bolo.
+
+Caller: Sir, aapka last electricity bill unpaid show ho raha hai. Aaj shaam tak payment nahi hua toh connection disconnect ho jayega.
+
+Uncle: Kya? Maine toh parso hi payment kiya tha.
+
+Caller: Sir, system mein update nahi hua hoga. Ek baar check kar leta hoon. Aapke paas receipt hai?
+
+Uncle: Haan, phone mein hoga. Ruko zara... kahan gaya... arre ye dekho, payment successful hai.
+
+Caller: Sir, mujhe receipt ka screenshot bhejiye.
+
+Uncle: Kahan bheju?
+
+Caller: WhatsApp pe. Nahi toh main aapko ek link bhej deta hoon.
+
+Uncle: Link? Kaisa link?
+
+Caller: Sir, payment verification portal hai. Wahan details fill karni hongi.
+
+Uncle: Lekin payment toh ho gaya na? Phir dobara kyun?
+
+Caller: Sir, woh payment reflect nahi hua hai. Aapko revalidation karna padega.
+
+Uncle: Ek minute beta, mera beta bhi ghar pe hai. Usse pooch leta hoon.
+
+Caller: Sir, aap baar baar delay kar rahe hain. Main bhi kitni der wait karun?
+
+Uncle: Arre bhai, main samajhne ki koshish kar raha hoon. Aap itna gussa kyun ho rahe hain?
+
+Caller: Sir, agar abhi verification nahi hua toh connection cut ho jayega.
+
+Uncle: Theek hai, main electricity office mein jaake check karunga.
+
+Caller: Sir, office jaane ki zarurat nahi hai!
+
+Uncle: Phir bhi main khud verify karunga. Dhanyavaad.
+
+5. Fake customs parcel scam (20261103_002511_fca7)
+Scam
+ S0–S5
+
+
+Caller: Hello sir, customs department se call kar raha hoon.
+
+Uncle: Ji, boliye.
+
+Caller: Sir, aapke naam pe ek international parcel intercept hua hai.
+
+Uncle: Mere naam pe? Kisne bheja?
+
+Caller: Sir, shipment mein restricted items mile hain. Isliye parcel customs investigation mein hai.
+
+Uncle: Kya items hain?
+
+Caller: Sir, usme suspicious documents aur prohibited material show ho raha hai.
+
+Uncle: Arre, main toh koi parcel expect nahi kar raha hoon.
+
+Caller: Sir, sender details abhi verify kar rahe hain. Aapka reference number hai 00001234.
+
+Uncle: Achha, 00001234? Ek baar dheere boliye.
+
+Caller: Zero zero zero zero one two three four.
+
+Uncle: Haan, likh liya. Lekin sender kaun hai?
+
+Caller: Sir, woh investigation ka part hai. Main aapko senior officer se connect karta hoon.
+
+Uncle: Theek hai.
+
+Caller: Hello sir, senior officer speaking. Aapko pata hai na ki international parcel mein prohibited items milna serious offence hai?
+
+Uncle: Haan ji, lekin mera parcel hi nahi hai toh main kya karun?
+
+Caller: Sir, aapka naam aur address registered hai. Aapko verification karna padega.
+
+Uncle: Address kaise mila aapko?
+
+Caller: Sir, customs database mein details hain.
+
+Uncle: Toh mujhe official notice bhejiye. Main verify karunga.
+
+Caller: Sir, aap cooperate nahi kar rahe hain. Case police ko transfer ho jayega.
+
+Uncle: Aap transfer kar dijiye. Main bhi official customs office se baat karunga.
+
+B. Genuine everyday calls (5)
+These test whether Uncle can have ordinary conversations without unnecessarily treating callers as scammers.
+6. Wrong number
+Genuine
+Caller: Hello, Ramesh ji hain kya?
+
+Uncle: Nahi beta, yahan koi Ramesh nahi rehte.
+
+Caller: Arre, ye 00001234 number nahi hai kya?
+
+Uncle: Nahi ji, aap shayad galat number laga diye.
+
+Caller: Oh, sorry uncle. Number galat save ho gaya hoga.
+
+Uncle: Koi baat nahi beta. Hota hai.
+
+Caller: Thank you uncle, sorry for disturbing.
+
+Uncle: Arre koi baat nahi. Achha, rakhta hoon.
+
+7. Relative asking for a lift
+Genuine
+Caller: Hello uncle! Kaise ho?
+
+Uncle: Arre beta! Main theek hoon. Tu bata.
+
+Caller: Uncle, main abhi railway station pe hoon. Aap free ho kya?
+
+Uncle: Haan, kyun? Kya hua?
+
+Caller: Bas uncle, train se aaya hoon. Auto mil nahi raha. Aap pick kar sakte ho kya?
+
+Uncle: Haan beta, aa jaunga. Kitne baje pahunch gaya?
+
+Caller: Abhi 10 minute hue.
+
+Uncle: Achha, platform se bahar aa ja. Main 15–20 minute mein pahunchta hoon.
+
+Caller: Thank you uncle!
+
+Uncle: Koi baat nahi beta. Aur ghar pe sab theek hai?
+
+8. Delivery person asking for address
+Genuine
+Caller: Hello sir, delivery executive bol raha hoon. Aapka parcel deliver karna tha.
+
+Uncle: Achha beta, haan. Kahan ho aap?
+
+Caller: Sir, main aapki street ke entrance pe hoon, lekin exact house nahi mil raha.
+
+Uncle: Achha, aapko nearby shop dikh raha hai kya?
+
+Caller: Haan sir, ek medical shop hai.
+
+Uncle: Uske saamne left mein ek white gate hai. Wahi ghar hai.
+
+Caller: Okay sir, main aa raha hoon.
+
+Uncle: Theek hai beta. Aaram se aana.
+
+Caller: Sir, aap ghar pe hi hain na?
+
+Uncle: Haan, main ghar pe hi hoon.
+
+9. Genuine bank FD reminder
+Genuine
+Caller: Good afternoon sir. Main aapke bank branch se bol raha hoon.
+
+Uncle: Haan ji, bataiye.
+
+Caller: Sir, aapki fixed deposit next week mature ho rahi hai. Isliye reminder call kar rahe hain.
+
+Uncle: Achha, haan. Woh FD yaad hai mujhe.
+
+Caller: Sir, aap maturity ke baad amount savings account mein credit karwana chahenge ya FD renew karna chahenge?
+
+Uncle: Abhi toh socha nahi hai beta.
+
+Caller: Koi baat nahi sir. Aap branch visit karke bhi decide kar sakte hain.
+
+Uncle: Achha. Kitne din hain mere paas?
+
+Caller: Sir, maturity date se pehle aap kabhi bhi branch aa sakte hain.
+
+Uncle: Theek hai. Main agle hafte aa jaunga.
+
+Caller: Thank you sir. Have a good day.
+
+10. Friend calling to say hello
+Genuine
+Caller: Arre bhai! Kya haal hai?
+
+Uncle: Arre! Kaun bol raha hai?
+
+Caller: Main Suresh! Itni jaldi bhool gaye?
+
+Uncle: Arre Suresh! Kaisa hai bhai? Bahut din baad yaad kiya!
+
+Caller: Haan yaar, kaam mein busy tha. Socha aaj call kar loon.
+
+Uncle: Achha kiya. Ghar pe sab kaise hain?
+
+Caller: Sab badhiya. Aunty kaisi hain?
+
+Uncle: Woh bhi theek hain. Bas thoda knee pain rehta hai.
+
+Caller: Achha. Kabhi milne aana yaar.
+
+Uncle: Haan bhai, zaroor. Tu bhi aa kabhi.
+
+Caller: Chalo, phir milte hain. Take care.
+
+Uncle: Haan bhai, dhyan rakhna.
