@@ -1303,6 +1303,19 @@ it), `transcript_native` (every segment verbatim with its time, language and len
 hang-up from the page; calls 2, 3, 4: 0 intel items, hang-up; call 5: 0 intel items, ended by Uncle's goodbye (the caller said "call disconnect
 karta hoon", rule hit "S5: disconnect +2"). No payment identifier in any of the five. The packets verify.
 
+## Evidence packet, PDF view and results page (3 Nov 2026)
+
+`mirage/packetpdf.py`, `tests/test_packetpdf.py`, `docs/results.md`. **Chosen: headless Edge (or Chrome) printing a generated HTML page.** The packet is turned into one
+self-contained HTML page (no scripts, no links, no external files, a content-security policy that allows nothing) and the installed browser prints it to A4; Edge
+shapes Devanagari with the system's Nirmala UI font (embedded in the PDF), which a hand-written PDF writer would not. `python -m mirage.packetpdf data/packets/<id>.json`
+writes `<id>.pdf` next to the packet (git-ignored with the rest of `data/`). The packet is verified first and a packet that does not verify is refused. The PDF is not
+itself hashed and says so; it carries the packet's sha256, `generated_at` and the verify command, and makes no claim about legal admissibility. Contents: the staged-demo
+label first, call summary, intel table (kind, value as heard, confidence label, needs confirmation, validity, verbatim quote, t, notes), stage timeline with the rule
+hits, a transcript excerpt (the segments carrying intel and their neighbours, plus the first and last few, capped at 14 and said to be an excerpt), ending and
+disclosure, integrity. Call 1's PDF is 2 pages. I could not render the PDF to an image here (no `pdftoppm`), so the layout was checked on a screenshot of the same HTML and
+the embedded fonts were read from the PDF; the owner opens the PDF. `docs/results.md` collects E1, E2, E4 and E5 with sample sizes, data type and limits; E1 is stated as
+too few samples to quote, E3 as dropped.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

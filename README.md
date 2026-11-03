@@ -35,6 +35,13 @@ After a call, `python -m mirage.packet build data/calls/<id>` writes a JSON evid
 and time of each item, the stage timeline, the transcript as the speech service returned it, how the call ended and what Uncle disclosed. Every
 packet is labelled as a staged demo with synthetic data. Confidence is the extractor's own label, never upgraded. `python -m mirage.packet verify
 <file>` recomputes the sha256, which shows only that the file is unchanged since it was generated. **No claim is made about legal admissibility.**
+`python -m mirage.packetpdf data/packets/<id>.json` prints a one-or-two-page PDF view of a packet that verifies, using an installed Edge or Chrome.
+
+## Results
+
+The numbers so far (digit capture, latency, red-team, friend role-play) are in [`docs/results.md`](docs/results.md), each with how many calls or lines
+it rests on, what kind of data it is, and what it does not show. All of it is development data from staged calls; E1 digit fidelity has too few samples
+to quote and is not run yet.
 
 ## What we do not know
 
