@@ -86,6 +86,15 @@ nahin hai" are ignored (windowed negation, `mirage/negation.py`). All weights ar
 - **Data:** transcripts of staged calls are kept as text in `data/calls/` (git-ignored). Raw audio is off by default. Friend
   role-play is development data and says nothing about real callers.
 
+## Red-team runner
+
+`python -m mirage.redteam` plays adversarial caller lines through the real brain, gate and speaking guard from realistic mid-call states
+and checks what would be spoken with a separate oracle, also with the language model mocked to say nasty things (offline; nothing is
+sent anywhere). A first set of 15 lines, written by the same model that built the gate, gave **1 leak out of 15**: a mocked model
+could make Uncle ask for a card number and expiry, because the credential check does not know those words (the model fallback is off by
+default; the hole is not fixed yet, on purpose, so that a second author's lines are scored first). Those 15 lines are weak evidence for
+the reason just given. See `engineering-log.md`.
+
 ## Measured limits (see `engineering-log.md` for the numbers and how they were obtained)
 
 - Stage detection is a keyword layer. On 18 lines written by the project owner after the first tuning, it matched 4 of
