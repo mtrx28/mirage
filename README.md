@@ -16,11 +16,39 @@ invented. A rule-based state machine picks what Uncle does; a safety gate checks
 One server process at a time (a lock file stops a second one). Keys go in `.env` only. See `docs/voice.md` for the voice path and
 `docs/engineering-log.md` for what was built, measured and decided.
 
+**Demo video:** _link to be added_
+
+## What this is not
+
+A browser demo. It is **not connected to any phone network**, it uses **no real caller data**, and it has **never spoken to a real scammer**.
+Every call so far was the owner or a friend playing the caller, with invented numbers and names.
+
+## Gnani models used
+
+- **Prisma v3.0**, streaming speech-to-text (Hindi, `hi-IN`, codemix, 8 kHz audio). It runs in Gnani's cloud: our server sends the caller's
+  audio over a WebSocket and gets transcript pieces back.
+- **Timbre v3.0**, text-to-speech (voice **Prakash**). It runs in Gnani's cloud: our server sends one line of text and plays back the audio it returns.
+
+**The language model is off by default, and the demo uses templates only.** Every word Uncle says comes from a reviewed line bank
+(`content/`), chosen by the rule-based state machine and checked by the safety gate.
+
+## Similar work
+
+Scam-baiting bots already exist, and this project did not invent the idea. Two I could verify:
+
+- **Lenny**, a telephone bot that plays pre-recorded clips of a slow-speaking elderly man to keep unwanted callers talking.
+- **Daisy**, announced by Virgin Media O2 in November 2024: an AI "granny" that talks to scam callers
+  ([9to5Mac report](https://9to5mac.com/2024/11/20/uk-carrier-o2-creates-ai-grandmother-daisy-to-waste-scammers-time-video/)).
+
+I read about these from news and web pages only, not from their code or any test of them. Mirage is **its own implementation** (written for this
+challenge, with AI assistance); it borrows no code from either. What it adds to the idea is an Indian-language persona and a focus on
+recording payment details with the exact words and time they were said.
+
 ## What Uncle does when the caller does not look like a scammer
 
-- Uncle always tells the truth about what he is. If someone sincerely asks "are you a robot?", and the call shows little sign of a
+- Uncle never claims to be a person. If someone sincerely asks "are you a robot?", and the call shows little sign of a
   scam, he says so at once: **"Main ek automated assistant hoon, insaan nahin."** If the call shows strong signs of a scam he first
-  evades twice in character (he "cannot hear"), then answers honestly. He never claims to be a person.
+  evades twice in character (he "cannot hear"), then answers honestly.
 - **The exit rule.** If, after a grace period of 8 of the caller's turns, the call has still shown no real evidence of a scam (no
   threat, payment demand, code request and so on; the score is under 1.0), Uncle ends the call politely and honestly, for example:
   "Maaf kijiye, main ek automated assistant hoon, insaan nahin. Baat karne ka shukriya, ye call ab khatam karta hoon." A call that has
@@ -37,11 +65,37 @@ packet is labelled as a staged demo with synthetic data. Confidence is the extra
 <file>` recomputes the sha256, which shows only that the file is unchanged since it was generated. **No claim is made about legal admissibility.**
 `python -m mirage.packetpdf data/packets/<id>.json` prints a one-or-two-page PDF view of a packet that verifies, using an installed Edge or Chrome.
 
+**Sample packet:** _to be added in `docs/sample/` (generated from the owner's rehearsal call)_
+
 ## Results
 
 The numbers so far (digit capture, latency, red-team, friend role-play) are in [`docs/results.md`](docs/results.md), each with how many calls or lines
 it rests on, what kind of data it is, and what it does not show. All of it is development data from staged calls; E1 digit fidelity is a 20-number live test (counts only, no rate);
 the 60-clip benchmark has not been run.
+
+## Limitations
+
+In plain words, with the numbers from [`docs/results.md`](docs/results.md) (and, for the stage rules, `docs/engineering-log.md`). All of it is
+**development data from staged calls**, small samples, one owner and one friend; none is a rate for real callers.
+
+- **Uncle stalls a lot.** In the five friend calls, 63 of 101 replies were a generic stall, using only four lines. Fixes since then cut the "I did not hear" lines
+  in a replay of the same calls, but that was a replay, not a new live test.
+- **Stage detection is weak on lines it has not seen.** The rules matched 4 of 18 of the owner's untouched lines (most of the rest claimed no stage), and 12 of 20 of the friend's held-out lines.
+- **Digit capture can be wrong while looking confident.** In the 20-number live test, 16 were stored exactly and 4 were not. One of the four (E16) was a case number cut to `653`
+  and stored as `keyword` confidence with no warning. In the rehearsal call a phone number was stored with one wrong digit (Prisma wrote चार where the owner says छह), also with `keyword` confidence and no warning.
+- **UPI provider names get garbled.** In the rehearsal call "ok axis" came back as "okay". The extractor keeps what it heard and lists likely handles as guesses; it does not correct it.
+- **No barge-in.** Uncle's side is half-duplex: while he speaks the microphone is muted, so a caller who starts talking over him is not heard until he finishes.
+- **Two values are unverified:** the short list of known UPI handles (written from memory, no official list found) and 112 as the emergency number the gate speaks (secondary sources only).
+- **The 60-clip digit benchmark was not run**, and nothing here covers noise, other microphones, or real callers.
+
+## Cost
+
+The dashboard showed **33.18 credits consumed for 115 requests** for the session that included the 20-number test, out of a 5,000-credit pool; the project stops
+spending at 4,000 (80%). The local ledger's own estimate for that session was 38.93, so it leans high, and has not been re-synced to the dashboard.
+
+## Acknowledgements
+
+A friend role-played the callers and wrote the test scripts and test lines used here.
 
 ## What we do not know
 
