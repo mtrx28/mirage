@@ -40,8 +40,8 @@ packet is labelled as a staged demo with synthetic data. Confidence is the extra
 ## Results
 
 The numbers so far (digit capture, latency, red-team, friend role-play) are in [`docs/results.md`](docs/results.md), each with how many calls or lines
-it rests on, what kind of data it is, and what it does not show. All of it is development data from staged calls; E1 digit fidelity has too few samples
-to quote and is not run yet.
+it rests on, what kind of data it is, and what it does not show. All of it is development data from staged calls; E1 digit fidelity is a 20-number live test (counts only, no rate);
+the 60-clip benchmark has not been run.
 
 ## What we do not know
 

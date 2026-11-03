@@ -1326,6 +1326,28 @@ Counts out of attempted overall and by style, speaker and label, with every fail
 dev-data banner. Each finding is used for at most one expected number, and a number listed twice in one call is warned about, because the extractor keeps one finding per label
 and value. Not run: no numbers have been recorded. `docs/results.md` has an E1 section saying so.
 
+## E1 small test: result, and failure gallery candidates (3 Nov 2026; staged, small sample, dev data)
+
+The owner ran the E1 scorer on 4 live calls with 20 invented numbers (10 per speaker, 10 per style): **16 of 20 stored exactly, 4 partly captured, none under the wrong label,
+none missed** (counts only; the full output and the failure details are in `docs/results.md`, "E1 small test"). No code was changed. Dashboard for this session: 33.18 credits
+for 115 requests, against our ledger's 38.93 (the ledger leans high by 5.75 credits; not re-synced).
+
+**Failure gallery candidates.** The blueprint wants a short gallery of bad calls and what was learned; no such section existed in this log, so this one starts it with the two
+failure mechanisms from this test. (Earlier candidates, not yet written up here: the headphone microphone that lost a slowly read number, Uncle answering in the middle of a number
+before the hold rule, and the half-duplex mute cutting off a caller who began speaking as Uncle did.)
+
+1. **Leading zeros wrong in the stored value** (E01, E17). The staged phone numbers start "0000", so the count of leading zeros matters. E01 was said with five zeros and stored with two
+   (`00758567`, unlabelled, needs confirmation); E17 was said with four and stored with five (`00000518824`), and because it then had 11 digits it was labelled `account` from its
+   length. The transcript pieces show two zero words in one case and five in the other; whether the speaker, the speech service or our joining miscounted cannot be told without the
+   audio. Lesson: a value that looks like a valid account can be a phone number with an extra zero; labels that come from length alone are a guess. Possible later directions, none started:
+   a rule for the "0000" prefix of a staged number, or asking the caller to repeat when a number starts with zeros.
+2. **The tail of a number did not reach the stored value** (E16, E19; the same shape as the lone "चार।" in call 1 of the friend session). E16 (`65369`) was stored as `653` with
+   `keyword` confidence and **no need to confirm**: a truncated number that looks like a clean capture, the one failure that gave no warning; the missing "69" probably came back as the English
+   words "Chat now" (an inference, no audio checked). E19 (`48365`) was stored as `483` (the final "छ" was not read as six, then a separate two-digit piece "चार पाँच"), flagged by the extractor itself
+   as "a digit may be missing". The extractor stores a run only if it has at least three digits and joins pieces only when they arrive close together and are digits. Lesson: a short number
+   said slowly is the one most likely to be cut, and a high label on a short value is not a sign it is whole. Possible later directions, none started: a read-back that asks for the rest when
+   a case number is shorter than usual, a spelling table that includes "छ", and not giving `keyword` confidence a "no need to confirm" for very short runs.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

@@ -7,7 +7,7 @@ too small to quote. Each section says what the data is, how much there is, and w
 
 | Experiment | Planned in the blueprint | What exists | Size | Data type |
 |---|---|---|---|---|
-| E1 digit fidelity | 60 clips, 4 noise levels, 3 output modes | **Not run.** A handful of anecdotal samples only; a small ~20-number live test has its scoring script built and is **waiting for the numbers** | about 11 digit strings, 5 different set-ups | owner's live speech, one clean clip |
+| E1 digit fidelity | 60 clips, 4 noise levels, 3 output modes | **The 60-clip test was not run.** A small live test was: **16 of 20 numbers stored exactly** (counts only, see E1), plus a handful of earlier anecdotal samples | 20 numbers in 4 live calls, two speakers; about 11 earlier strings | staged live speech, owner and friend |
 | E2 latency | p50 and p95 on every test call | Measured on the live loop | 101 replies in 5 calls, plus 7 in a solo call | friend role-play, one computer |
 | E3 FSM vs LLM simulator | simulator comparison | **Dropped** (Gemini daily limit) | none | none |
 | E4 red-team | 30 adversarial lines | 30 lines run, 15 by the model that built the gate and 15 by the friend | 30 lines x 7 states, plus 189 model probes | text, mocked model |
@@ -15,7 +15,7 @@ too small to quote. Each section says what the data is, how much there is, and w
 
 ## E1: digit fidelity
 
-**There are too few samples to quote a Digit Fidelity figure, so none is given.** The experiment as designed (60 scripted clips; Hindi,
+**There are too few samples to quote a Digit Fidelity figure, so none is given.** (A small 20-number live test was added afterwards; its counts are in "E1 small test" below, and they are counts, not a rate.) The experiment as designed (60 scripted clips; Hindi,
 Hinglish and Tamil-English; degraded to 8 kHz at four noise levels; three output modes; a Prisma v2.5 comparison) **has not been run**. What
 exists is a handful of digit strings said in other tests, under different conditions, which say where the weak points are and nothing more:
 
@@ -33,23 +33,71 @@ comparison with Prisma v2.5, how often real callers dictate digit by digit, or a
 quality dominates, and slow single-digit dictation is Prisma's and our turn logic's weak spot.** E1 should be run properly before any digit
 claim is made.
 
-### E1 small test: the scoring side is built, and it has not been run
+### E1 small test: 20 numbers in 4 live calls
 
-**Status: not run. No numbers have been recorded yet, so this page gives no result for it.** When the owner has said about 20 numbers in a few live calls and
-provided the list, the counts will be added here, labelled as below.
+**Staged, small sample, two speakers, development data. This is not the Digit Fidelity benchmark, and it is not a rate for real callers.** It was run on 3 Nov 2026:
+4 live calls (`20261103_141948_bb27`, `20261103_142528_d3bc`, `20261103_142848_cff0`, `20261103_143249_ea6b`), **20 invented numbers**, 10 said by the owner and 10 by the
+friend, 10 in each style (one digit per pause; natural groups), in the same live set-up as the earlier sessions (the microphone and room were not recorded separately). The mix of labels was 8 phone, 6 account-style and
+6 case numbers. `python -m mirage.e1` compared each expected number with what the extractor **stored during the call** (`findings.json`); the extractor was not re-run, so
+this scores the system as it was on that day. A number counts as captured only if its full value matches. It measures the whole chain at once (microphone, Prisma, our
+turn-taking and the extractor), not Prisma alone.
 
-**What it will cover.** About 20 invented numbers (phone numbers, case numbers and account-style numbers) said by two people (the owner and the friend) in a few
-live calls, in two styles: one digit per pause, and in natural groups. `python -m mirage.e1 <expected file> <call id> ...` (template: `docs/e1_expected_template.txt`)
-compares each expected number with what the extractor **stored during that call** (`findings.json`; the extractor is not re-run, so it scores the system as it was
-then). For each number it says one of: **captured exactly** (same full value and same label), **captured with the wrong label** (same full value, for example
-`ambiguous` instead of `phone`), **partly captured** (a piece of it, a longer string that contains it, or one digit wrong), or **missed**. A number counts as captured
-only if its **full value** matches. It prints counts out of attempted, overall and per style, speaker and label, and lists every failure with what was stored instead.
-Counts only, no percentages.
+**Counts, exactly as the scorer printed them** (no percentages):
 
-**What it will not show.** It measures the whole chain at once (the microphone, Prisma, our turn-taking and the extractor), not Prisma's accuracy alone, so a miss
-can have any of those causes (the failure list shows the stored value, which helps tell them apart but does not settle it). It is about 20 numbers, two speakers, one
-set-up, quiet-room live speech: **no noise levels, no output modes, no Tamil-English, no comparison with another model, no rate.** It is staged, small-sample development
-data and is not the 60-clip Digit Fidelity test in the blueprint. Numbers shorter than three digits are never stored by the extractor, so they are not scored.
+```
+ALL: full value 16 of 20 attempted; exact 16 of 20; wrong label 0; partial 4; missed 0
+by style:
+  natural_groups        full value 9 of 10; exact 9 of 10; wrong label 0; partial 1; missed 0
+  one_digit_per_pause   full value 7 of 10; exact 7 of 10; wrong label 0; partial 3; missed 0
+by speaker:
+  friend                full value 8 of 10; exact 8 of 10; wrong label 0; partial 2; missed 0
+  owner                 full value 8 of 10; exact 8 of 10; wrong label 0; partial 2; missed 0
+by label:
+  account               full value 5 of 6; exact 5 of 6; wrong label 0; partial 1; missed 0
+  case                  full value 4 of 6; exact 4 of 6; wrong label 0; partial 2; missed 0
+  phone                 full value 7 of 8; exact 7 of 8; wrong label 0; partial 1; missed 0
+```
+
+**No claim is made about one digit per pause against natural groups, or about the owner against the friend.** The differences are two numbers (7 against 9 of 10) and none
+(8 against 8 of 10); with 10 numbers in each group that is not a finding.
+
+**The four failures, by mechanism** (what was stored is quoted as logged):
+
+*1. The number of leading zeros is wrong in the stored value (E01, E17).*
+
+| id | said | stored | label and confidence | quote it came from |
+|---|---|---|---|---|
+| E01 | `00000758567` (account, one digit per pause, owner) | `00758567` (8 digits: two zeros where five were said) | `ambiguous`, confidence `none`, needs confirmation | 'zero \| zero \| सात \| पाँच \| आठ \| पााँच छः \| सात' at t=40.62 |
+| E17 | `0000518824` (phone, one digit per pause, owner) | `00000518824` (11 digits: five zeros where four were said) | `account`, confidence `length`, needs confirmation | 'Zero \| zero zero zero zero \| पाँच एक आठ आठ दो चार' at t=95.28 |
+
+The quote shows two zero words for E01 and five for E17 (a standalone "Zero" piece, then "zero zero zero zero"). Whether the speaker, the speech service or our joining of
+pieces miscounted the zeros cannot be told from the logs without the audio; the stored value is simply wrong in the leading zeros. A number that starts "0000" is how
+the staged phone numbers are written, so this is likely to matter for them.
+
+*2. The tail of the number did not reach the stored value (E16, E19; the same shape as the lone "चार।" in call 1 of the friend session).*
+
+| id | said | stored | label and confidence | what the log shows |
+|---|---|---|---|---|
+| E16 | `65369` (case, natural groups, friend) | `653` | `case`, confidence `keyword`, **needs confirmation: no** | 'छः, पाँच, तीन' at t=146.64; the next piece, at 148.2 s, is the English words "Chat now" (probably "छह नौ", the missing "69", heard as English words; an inference, the audio was not checked) |
+| E19 | `48365` (case, one digit per pause, friend) | `483` | `ambiguous`, confidence `none`, needs confirmation, with the extractor's own note "a digit may be missing" | 'चार आठ तीन छ।' at t=160.94 (the final "छ" is not read as the digit six), then a separate piece 'चार पाँच।' at 162.5 s |
+
+In both, the first digits were stored and the rest arrived in later pieces that were not digits the extractor could read, or were too short to store (a run needs at least
+three digits) or to join. Joining would not by itself have rescued E19: the second piece reads "चार पाँच" (4 5), not 6 5.
+
+**Some failures look plausible, and the evidence packet shows the extractor's label as it is.** E16 was stored as a `case` number with `keyword` confidence and **no need to
+confirm**, although two of its five digits are missing: it looks like a clean capture, and it is the one failure that gives no warning. E17 was stored as an 11-digit
+`account` number labelled from its length alone, a wrong value that fits the account shape. (E01, E17 and E19 were at least flagged as needing confirmation.) Nothing
+corrects these afterwards: the packet copies the label and the confidence exactly as the extractor logged them, so a packet built from these calls would carry E16 and E17 as
+they were stored.
+
+**What this test does and does not show.** It shows that in these live calls, with two people saying invented numbers, 16 of 20 full values were stored
+exactly and none was stored under the wrong label, and where the other four went wrong: leading zeros, and number tails. It does not show a rate, any difference between styles
+or speakers, any behaviour with noise, a degraded line, other microphones, other output modes or Tamil-English, or how real callers say numbers. It does not separate Prisma's
+errors from ours. The blueprint's 60-clip test remains unrun.
+
+**Credits for this session** (the test calls included): the dashboard's figure was **33.18 credits consumed for 115 requests**, while our ledger's estimate is **38.93**, so the
+estimate leans high by 5.75 credits, as expected (it counts Prisma's reported seconds, padding and empty segments included, and the line characters at first audio).
+Treat 33.18 as the figure to trust and the ledger as an upper estimate; the ledger has not been re-synced to it.
 
 ## E2: latency
 
@@ -141,4 +189,4 @@ time without a technical fault"**. It cannot support any claim about holding a r
 
 `docs/engineering-log.md` sections: "Voice path, stop 1 (the first two real runs; the re-run with a proper microphone)", "Voice path, solo check of the full loop",
 "Friend session", "After the friend session: one small fixes stop", "Second gate stop", "Red-team runner, step 1 and step 2", "Evidence packet". Scope and
-disclosure limits: `docs/safety.md`. Not yet measured anywhere: E1 proper, E3, any real-caller behaviour, any speech recognition result at 8 kHz with noise.
+disclosure limits: `docs/safety.md`. The E1 small test's scorer output is kept locally in `data/e1/` (git-ignored). Not yet measured anywhere: E1 proper (the 60-clip benchmark), E3, any real-caller behaviour, any speech recognition result at 8 kHz with noise.
