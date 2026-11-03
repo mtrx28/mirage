@@ -1257,6 +1257,52 @@ challan, FIR, court, police, problem, dikkat, mushkil, trouble, anjaam, sazaa ..
 - **Risks that remain:** the consequence list is a list. A threat with an unlisted consequence ("toh bahut pachtana padega") is still read as a warning;
   a warning that happens to name a listed word ("nahin karna chahiye, toh police ko batayiye") is read as a threat, which for the stage score is the wrong
   direction (a false S3) though for the exit rule it is the safe one (the call stays). No scam script or live call contains either shape.
+## Evidence packet, JSON only (3 Nov 2026; staged calls, synthetic data)
+
+`mirage/packet.py`, `tests/test_packet.py`. Build: `python -m mirage.packet build data/calls/<id> [...] [--out data/packets]`. Verify:
+`python -m mirage.packet verify data/packets/<id>.json`. Rules only, offline: it reads the call folder the live call saved (`summary.json`,
+`events.jsonl`, `transcripts.jsonl`, `turns.jsonl`, `findings.json`) and nothing else; no model, no network. Packets are written to `data/packets/`
+(git-ignored, because they hold a friend's transcripts). The PDF is not built.
+
+**Fields** (the blueprint's, plus what an honest reader needs): `call_id`, `duration_s`, `language` (hi-IN, the requested locale) with
+`languages_detected` (counts per segment), `scenario`, `intel` (each item: kind, value as heard, confidence, needs_confirmation, valid, reason,
+candidates, suggested, the verbatim `quote`, its time `t`), `payment_intel`, `stage_timeline` (stage, from_s, to_s, and the rule hits that entered
+it), `transcript_native` (every segment verbatim with its time, language and length), `transcript_latin`, `integrity`; and extras: a staged-demo
+`label` and `data_status`, `uncle_lines` (what Uncle said, with time and tactic), `capture` (seconds of caller audio silenced while Uncle spoke),
+`disclosure`, `ending`, `audio` (the hash of the saved audio file if it still exists, never the audio), `source_files` (sha256 of each log used),
+`limitations`.
+
+**Decisions, and why.**
+
+- *Confidence stays a label.* The blueprint's example shows a number (0.82). The extractor produces labels (keyword, weak_keyword, expected,
+  length, none, heard), not probabilities, so the packet copies the label, the validity and `needs_confirmation`, and explains each label that
+  appears. Nothing is upgraded, rescored or turned into a number (tests: an `expected` item stays `expected`, an ambiguous item keeps its
+  candidates, and changing a label afterwards breaks the hash).
+- *A piece of a longer number is pointed out, not merged.* Call 1 recorded `00001234` (keyword) and `1234` (expected), the second being the
+  caller repeating the end of the first. Both are kept as recorded; the second carries `possibly_part_of: "00001234"`.
+- *`transcript_latin` is null,* with the reason: these calls used Prisma's `codemix` format only, a Latin copy needs the service's own
+  transliteration, which was not requested, and none was invented.
+- *Stages and intel are as recorded during the call,* by the rules in force then. A later change to the rules does not alter a saved call. This matters
+  for these five calls: they were recorded before the negation and word-family fixes, so for example call 1's move to S3 and call 2's move to S3 both
+  came from a caller who was WARNING against payment. The packet shows that move and its rule hit ("S3: payment +3") without correcting it.
+- *`payment_intel`* holds UPI ids, account numbers and IFSC codes only, named as in the blueprint (`upi_vpa`, `account_number`, `ifsc`). None of the five calls captured
+  one, and the packet says so in `payment_intel_note`. `claimed_identity` from the blueprint is not included: there is no rule that extracts an agency or an officer
+  name, and none was invented.
+- *The hash* is sha256 over the canonical JSON (UTF-8, sorted keys, no spaces, no ASCII escaping) of the packet WITHOUT the `integrity` block.
+  `generated_at` (in +05:30) is also a top-level field, so the timestamp is covered by the hash, and the integrity block carries the same value
+  (verify checks they match). `verify` recomputes the hash and also checks that every intel quote really occurs, piece by piece, in the
+  native transcript. Changing a value, a confidence, a transcript line, a stage, the ending, the label or the timestamp fails (tests).
+- *How the call ended* (`ending`): `caller_side_hangup` (the page's Hang up; the log cannot say who pressed it), `goodbye`, `exit_rule`,
+  `identity_disclosure`, `emergency_disclosure`, `hostile_goodbye`, `limit` (with which limit, and whether Uncle's goodbye was said) or `other`;
+  classified from the end reason and the last turn's tactic. `disclosure` counts identity questions deflected or answered honestly, whether Uncle
+  said "automated assistant" and when, and states the project's own policy, marked as not a legal opinion.
+- *No claim about legal admissibility:* the only sentence about it, in the integrity note, says no claim is made; a test counts that the word
+  appears once and that phrases such as "legally valid" or "court-ready" do not appear.
+
+**The five friend-session packets** (staged role-play, development data): call 1, 2 intel items (`00001234` keyword, `1234` expected), ended by a
+hang-up from the page; calls 2, 3, 4: 0 intel items, hang-up; call 5: 0 intel items, ended by Uncle's goodbye (the caller said "call disconnect
+karta hoon", rule hit "S5: disconnect +2"). No payment identifier in any of the five. The packets verify.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

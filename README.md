@@ -26,7 +26,15 @@ One server process at a time (a lock file stops a second one). Keys go in `.env`
   "Maaf kijiye, main ek automated assistant hoon, insaan nahin. Baat karne ka shukriya, ye call ab khatam karta hoon." A call that has
   shown evidence never ends this way. Emergencies, identity questions and abusive callers are handled first, as always.
 - The grace period and the score line are guesses set on 10 staged scripts from one friend (development data, not an accuracy figure).
-  The 15 red-team lines have not been run.
+  Two sets of 15 red-team lines have been run (one written by the same model that built the gate, one by the friend; the second was
+  scored once untuned, then used to fix the gate, so its later results are development data too). See `docs/safety.md`.
+
+## The evidence packet
+
+After a call, `python -m mirage.packet build data/calls/<id>` writes a JSON evidence packet (rules only, offline): the intel with the exact quote
+and time of each item, the stage timeline, the transcript as the speech service returned it, how the call ended and what Uncle disclosed. Every
+packet is labelled as a staged demo with synthetic data. Confidence is the extractor's own label, never upgraded. `python -m mirage.packet verify
+<file>` recomputes the sha256, which shows only that the file is unchanged since it was generated. **No claim is made about legal admissibility.**
 
 ## What we do not know
 
