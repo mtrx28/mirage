@@ -55,7 +55,8 @@
       "baad mein baat": 2.0, "baad mein call": 2.0, "dubara call": 1.5, "band kar raha": 2.0,
       "time waste": 2.0, "faltu": 1.5, "bekaar": 1.5, "bewakoof": 1.5, "chhod do": 1.0,
       "theek hai baad mein": 2.0, "thik hai baad mein": 2.0,
-      "call cut": 2.0, "call band": 2.0, "chhodo": 1.0, "dobara call": 1.5
+      "call cut": 2.0, "call band": 2.0, "chhodo": 1.0, "dobara call": 1.5,
+      "call end": 2.0, "call close": 2.0, "कॉल एंड": 2.0, "कॉल क्लोज": 2.0, "कॉल बंद": 2.0
     }
   },
   "stems": {
@@ -92,5 +93,19 @@
       ]
     }
   },
-  "goodbye_words_note": "S5 words above double as the goodbye detector."
+  "goodbye_words_note": "S5 words above double as the goodbye detector.",
+  "negation": {
+    "_about": "A payment or code keyword (stages S3 and S4, and the signals ask_otp, ask_credential, ask_install) does not count when the caller is warning against it: 'Payment karne ko bol sakte hain, aap aise mat kariyega' or 'OTP kisi ko mat bataiye'. This is a WINDOW, not a blanket rule. A prohibition word (mat, never, don't, do not, should not, no need) negates a keyword when it is up to `before` words before it, or up to `after` words after it AND is followed within two words by a request verb (the window crosses a full stop on purpose). A plain 'nahin / not' negates only when a request verb follows it within two words ('payment nahin karni chahiye'), or when it follows 'zaroorat / need' ('karne ki zaroorat nahin hai'). So 'payment reflect nahin hua' (a demand) still counts. Known limit: a threat worded with a request verb ('payment nahin karna toh arrest') is read as a warning.",
+    "before": 3,
+    "after": 10,
+    "prohibitions": ["mat", "मत", "never", "don t", "do not", "should not", "shouldn t", "no need", "dont", "मत"],
+    "soft": ["nahin", "nahi", "नहीं", "नही", "not"],
+    "need_words": ["zaroorat", "jaroorat", "जरूरत", "ज़रूरत", "need", "needed", "required", "zaroori", "ज़रूरी", "जरूरी"],
+    "request_verbs": ["karni", "karna", "karne", "kare", "karein", "karen", "kariye", "kijiye", "dena", "deni", "den", "dein", "dijiye",
+                      "batana", "bataye", "bataiye", "bataen", "batayein", "bhejna", "bhejni", "bhejiye", "bhejein", "bhejen", "chahiye",
+                      "करनी", "करना", "करने", "करें", "करे", "करिए", "करिये", "कीजिए", "कीजिये", "देना", "देनी", "दें", "दीजिए", "दीजिये",
+                      "बताना", "बताएं", "बताएँ", "बताइए", "बताइये", "भेजना", "भेजनी", "भेजिए", "भेजिये", "भेजें", "चाहिए", "चाहिये",
+                      "pay", "share", "send", "give", "tell", "provide", "transfer", "disclose", "required", "needed", "necessary"],
+    "bare_verbs": ["kar", "karo", "kariyega", "करिएगा", "kijiyega", "कीजिएगा", "कर", "करो", "देना", "dena"]
+  }
 }

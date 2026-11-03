@@ -543,3 +543,23 @@ def test_the_summary_has_the_findings_the_stage_timeline_and_the_gate_decisions(
     assert summary["findings"]["case"] == ["47291"] and summary["turns"] == 1 and summary["gate_log"]
     assert json.loads((rig.folder() / "findings.json").read_text(encoding="utf-8"))["case"][0]["quote"]
     assert summary["final_stage"] in ("S0", "S1", "S2", "S3", "S4", "S5") and "stage_timeline" in summary
+
+
+def test_the_goodbye_turn_that_ends_the_call_is_counted_in_the_summary(tmp_path):
+    # Friend session (staged role-play), call 5: the call ended on Uncle's goodbye and summary.json said 24 turns and 24 lines
+    # spoken while turns.jsonl had 25, because the summary was written before the last turn was recorded.
+    async def go():
+        rig = Rig(tmp_path)
+        await rig.start()
+        await rig.say("u1", "hello")
+        await rig.until(lambda: "latency" in rig.kinds())
+        await rig.say("u2", "ठीक है sir call disconnect करता हूँ।")
+        await rig.until(lambda: rig.kinds().count("ended") == 1, timeout=8.0)
+        await rig.close()
+        return rig
+
+    rig = run(go())
+    summary = json.loads((rig.folder() / "summary.json").read_text(encoding="utf-8"))
+    rows = rig.rows("turns.jsonl")
+    assert summary["end_reason"] == "uncle_ended" and rows[-1]["tactic"] == "goodbye_wrap"
+    assert summary["turns"] == len(rows) == 2 and summary["uncle_lines_spoken"] == 2 and len(summary["gate_log"]) == 2

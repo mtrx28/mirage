@@ -24,9 +24,10 @@ from pathlib import Path
 from typing import Callable
 
 from mirage.config import ROOT, FSMConfig
-from mirage.extract import (DIGIT_KINDS_TIDY, Finding, Transcript, ends_with_digits, extract_intel, norm_word,
-                            redundant_fragment)
+from mirage.extract import (DIGIT_KINDS_TIDY, Finding, Transcript, ends_with_digits, extract_intel, lone_digits, norm_word,
+                            redundant_copy, redundant_fragment, trailing_label)
 from mirage.lines import Line, LineBank, SlotOption, load_lines, text_problems
+from mirage.negation import NO_NEGATION, Negation, counts as keyword_counts, load_negation, negated_by
 from mirage.persona import Persona, load_persona
 from mirage.spoken import render_fact, speak_code, speak_digits
 
@@ -78,6 +79,7 @@ class Rules:
     own_request: set[str]
     own_facts: list[tuple[str, list[tuple[str, ...]]]]
     own_direct: list[tuple[str, list[tuple[str, ...]]]]    # phrases that ask for a fact without "aapka ... bataiye"
+    negation: Negation = NO_NEGATION
 
 
 # Stems of very common verbs would match half of all Hindi sentences, so the loader refuses them.
@@ -113,23 +115,50 @@ def load_rules(path: Path = RULES_PATH) -> Rules:
         {norm_word(w) for w in own["possessive"]}, {norm_word(w) for w in own["request"]},
         [(fact, [_phrase(w) for w in words]) for fact, words in own["facts"]],
         [(fact, [_phrase(w) for w in words]) for fact, words in own.get("direct", [])],
+        load_negation(raw["negation"], words_of) if "negation" in raw else NO_NEGATION,
     )
+
+
+# Stages whose keywords a warning ("do not pay", "do not share the OTP") must not trigger, and the signals that get the same check.
+NEGATABLE_STAGES = ("S3", "S4")
+NEGATABLE_SIGNALS = ("ask_otp", "ask_credential", "ask_install")
+
+
+def score_text_ex(rules: Rules, text: str) -> tuple[dict[str, float], dict[str, list[str]], dict[str, list[str]]]:
+    """Score one utterance against every stage. Each keyword counts once. Returns (scores, hits, ignored): `ignored` lists the
+    payment or code keywords that were left out because a warning word sits next to them (see mirage/negation.py)."""
+    tokens = words_of(text)
+    scores = {s: 0.0 for s in STAGES}
+    hits: dict[str, list[str]] = {s: [] for s in STAGES}
+    ignored: dict[str, list[str]] = {s: [] for s in STAGES}
+    neg = rules.negation
+    for stage in STAGES:
+        check = stage in NEGATABLE_STAGES
+        for label, phrase, weight in rules.stages.get(stage, []):
+            if not (phrase and _has(tokens, phrase)):
+                continue
+            ok, why = keyword_counts(neg, tokens, phrase) if check else (True, None)
+            if ok:
+                scores[stage] += weight
+                hits[stage].append(f"{label} +{weight:g}")
+            else:
+                ignored[stage].append(f"{label} (warned against by '{why}')")
+        for label, stem, weight in rules.stems.get(stage, []):
+            spots = [i for i, t in enumerate(tokens) if t.startswith(stem)]
+            if not spots:
+                continue
+            why = None
+            if check and all((why := negated_by(neg, tokens, i, i + 1)) for i in spots):
+                ignored[stage].append(f"{label}* (warned against by '{why}')")
+                continue
+            scores[stage] += weight
+            hits[stage].append(f"{label}* +{weight:g}")
+    return scores, hits, ignored
 
 
 def score_text(rules: Rules, text: str) -> tuple[dict[str, float], dict[str, list[str]]]:
     """Score one utterance against every stage. Each keyword counts once."""
-    tokens = words_of(text)
-    scores = {s: 0.0 for s in STAGES}
-    hits: dict[str, list[str]] = {s: [] for s in STAGES}
-    for stage in STAGES:
-        for label, phrase, weight in rules.stages.get(stage, []):
-            if phrase and _has(tokens, phrase):
-                scores[stage] += weight
-                hits[stage].append(f"{label} +{weight:g}")
-        for label, stem, weight in rules.stems.get(stage, []):
-            if any(t.startswith(stem) for t in tokens):          # bhej -> bhejiye, bhejo, bhejna, bhejni ...
-                scores[stage] += weight
-                hits[stage].append(f"{label}* +{weight:g}")
+    scores, hits, _ = score_text_ex(rules, text)
     return scores, hits
 
 
@@ -162,12 +191,13 @@ def score_line(rules: Rules, text: str, findings, prev_text: str = "", current: 
     """THE scoring function. The brain calls it for every turn and the stage tests call it for every test line, so
     the two cannot drift apart. Words of this line, plus a little of the previous line's weight, plus a boost for
     each finding (a payment identifier points at S3, a case number at S1)."""
-    scores, hits = score_text(rules, text)
+    scores, hits, ignored = score_text_ex(rules, text)
     evidence = any(hits.values())
     if prev_text:
         prev_scores, _ = score_text(rules, prev_text)
         scores = {s: scores[s] + rules.prev_weight * prev_scores[s] for s in STAGES}
     reasons = [f"{s}: " + ", ".join(h) for s, h in hits.items() if h]
+    reasons += [f"{s}: ignored " + ", ".join(h) for s, h in ignored.items() if h]
     current_stage_hit = current is not None and bool(hits[current])
     for f in findings:
         boost = finding_boost(rules, f)
@@ -251,7 +281,8 @@ class Signals:
 
 def detect_signals(rules: Rules, text: str) -> Signals:
     tokens = words_of(text)
-    names = [n for n, phrases in rules.signals.items() if any(_has(tokens, p) for p in phrases)]
+    names = [n for n, phrases in rules.signals.items()
+             if any((keyword_counts(rules.negation, tokens, p)[0] if n in NEGATABLE_SIGNALS else _has(tokens, p)) for p in phrases)]
     own_fact = None
     if any(t in rules.own_possessive for t in tokens) and any(t in rules.own_request for t in tokens):
         for fact, phrases in rules.own_facts:
@@ -338,6 +369,8 @@ class CallState:
     readbacks_by_kind: dict[str, int] = field(default_factory=dict)
     asked: dict[str, int] = field(default_factory=dict)
     expected: str | None = None
+    label_hint: str | None = None                       # the last turn ENDED on a label ("Case reference"): the next number is that kind
+    readback_open: tuple[str, str, int] | None = None   # (kind, value, digits read back) of Uncle's last read-back
     awaiting_digits: bool = False
     last_llm_turn: int = -100
     ended: bool = False
@@ -398,11 +431,13 @@ class CallBrain:
         self.transcripts.append(Transcript(text, t, audio_s))
 
     def reply_wait_s(self) -> float:
-        """How long to wait after the last transcript before replying. Longer in digit-dictation mode, because the
-        caller may be in the middle of a number and the next transcript should be joined to this one."""
+        """How long to wait after the last transcript before replying. Longer when the unanswered text ENDS on a digit,
+        because the caller may be in the middle of a number and the next transcript should be joined to this one. (Until
+        2 Nov the wait also applied to every turn right after Uncle asked for a number; the friend session showed 8 of 10
+        such turns had no digits at all and paid 1.5 s for nothing.)"""
         pending = self.transcripts[self.state.answered:]
         mid_number = bool(pending) and ends_with_digits(pending[-1].text)
-        if self.state.awaiting_digits or mid_number:
+        if mid_number:      # only when the text really ends on a digit; asking for a number no longer slows the next, unrelated, reply
             return self.cfg.digit_wait_s
         return self.cfg.normal_wait_s
 
@@ -416,11 +451,17 @@ class CallBrain:
             raise ValueError("nothing to respond to: call hear() first")
         text = " ".join(t.text for t in pending)
 
+        # What the number is: the caller's own label from the end of the last turn wins over Uncle's hint.
+        expected = st.label_hint or st.expected
+        held = [(k, g.value) for k in DIGIT_KINDS_TIDY for g in st.intel.get(k, [])]
         findings = tuple(
             replace(f, source_index=f.source_index + start)
-            for f in extract_intel(pending, synthetic_mode=self.cfg.synthetic_mode, expected=st.expected,
+            for f in extract_intel(pending, synthetic_mode=self.cfg.synthetic_mode, expected=expected,
                                    join_window_s=self.cfg.join_window_s)
+            if not redundant_copy(f, held)                      # a repeat of the end of a number we already hold
         )
+        self._join_lone_digits(lone_digits(text), findings)
+        st.label_hint = trailing_label(text)
         st.expected = None
         self._record_intel(findings)
         signals = detect_signals(self.rules, text)
@@ -473,6 +514,23 @@ class CallBrain:
         return plan
 
     # ------------------------------------------------------------------ pieces of a turn
+
+    def _join_lone_digits(self, lone: str, findings: tuple[Finding, ...]) -> None:
+        """The caller said only one or two digits ("चार") right after Uncle read back the start of a number. Those digits are the
+        next ones of THAT number: if they match what we hold, the number is confirmed once it is complete. (Too short to be a
+        number by themselves, they used to be thrown away.) If they do not match, nothing is changed."""
+        st = self.state
+        if not lone or findings or not st.readback_open:
+            return
+        kind, value, k = st.readback_open
+        joined = value[:k] + lone
+        if not value.startswith(joined) or len(joined) < len(value):
+            return
+        bucket = st.intel.get(kind, [])
+        for i, g in enumerate(bucket):
+            if g.value == value and g.needs_confirmation:
+                note = "completed by the digits the caller said after the read-back"
+                bucket[i] = replace(g, needs_confirmation=False, reason="; ".join(filter(None, [g.reason, note])))
 
     def _record_intel(self, findings: tuple[Finding, ...]) -> None:
         intel = self.state.intel
@@ -529,7 +587,9 @@ class CallBrain:
         st.tactic_uses[choice.tactic] = self._uses(choice.tactic) + 1
         if choice.tactic in ("app_not_opening", "otp_late", "limit_exceeded_second_account"):
             st.used_obstacles.add(choice.tactic)        # one-shot per call
+        st.readback_open = None
         if choice.tactic == "readback_partial" and choice.readback:
+            st.readback_open = (choice.readback.kind, choice.readback.value, self._readback_len(choice.readback))
             st.readback_done.add((choice.readback.kind, choice.readback.value))
             st.readbacks += 1
             kind = choice.readback.kind
@@ -639,6 +699,11 @@ class CallBrain:
         oldest = min(st.last_used.get(ln.id, -1) for ln in candidates)       # all were used recently: the oldest one
         return self.rng.choice([ln for ln in candidates if st.last_used.get(ln.id, -1) == oldest])
 
+    def _readback_len(self, f: Finding) -> int:
+        """How many digits of a number Uncle reads back: about half, between the configured minimum and maximum."""
+        cfg, n = self.cfg, len(f.value)
+        return min(max(math.ceil(n / 2), cfg.readback_min_digits), cfg.readback_max_digits, n - 1)
+
     def _render(self, choice: _Choice, stage: str) -> tuple[Line, str, list[DigitSource], str | None]:
         cfg = self.cfg
         line = self._pick(choice.tactic)
@@ -656,8 +721,7 @@ class CallBrain:
             sources += [DigitSource(d, s, "persona", field=fact.key) for d, s in pairs]
         if choice.readback:
             f = choice.readback
-            n = len(f.value)
-            k = min(max(math.ceil(n / 2), cfg.readback_min_digits), cfg.readback_max_digits, n - 1)
+            k = self._readback_len(f)
             prefix = f.value[:k]
             spoken = (speak_code if f.kind == "ifsc" else speak_digits)(prefix, group=cfg.digit_group, style=cfg.digit_style)
             values["readback"] = spoken

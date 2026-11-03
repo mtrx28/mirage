@@ -541,10 +541,45 @@ def redundant_fragment(value: str, others: Sequence[tuple[str, str]]) -> bool:
     return bool(value) and any((len(v) > len(value) and value in v) or (v == value and k != "ambiguous") for k, v in others)
 
 
+def redundant_copy(f: Finding, others: Sequence[tuple[str, str]]) -> bool:
+    """Is `f` a repeat of only the END of a number of the same kind that is held already? Friend session: the caller read
+    "Case reference 0000 1234" (kept: keyword), then repeated "1234", which was labelled a case only by Uncle's own hint
+    ("expected"): a second card for a piece of the first. True if `f` is not keyword-labelled and a strictly longer number of the
+    SAME kind contains it. `others` are (kind, value) pairs."""
+    return f.confidence != "keyword" and f.kind in DIGIT_KINDS_TIDY and bool(f.value) and any(
+        k == f.kind and len(v) > len(f.value) and f.value in v for k, v in others)
+
+
+LABEL_LOOKBACK = 3
+
+
+def trailing_label(text: str) -> str | None:
+    """What the caller said the NEXT number would be, if the text ends on a label with no digits after it: "Case reference" ->
+    "case". The brain carries it to the next turn, because Prisma may end a transcript between the label and the digits."""
+    toks = [t for t in _tokenize(text, 0) if t.kind not in ("sep", "break")][-LABEL_LOOKBACK:]
+    if not toks or any(t.kind in ("digit", "numeral", "mult", "vpa", "at") for t in toks):
+        return None
+    for t in reversed(toks):
+        hit = KEYWORDS.get(t.norm)
+        if hit and hit[1]:
+            return hit[0]
+    return None
+
+
+def lone_digits(text: str, min_run: int = 3) -> str:
+    """The digits of a text that is nothing but one or two digit words ("चार।"), else "". Too short to be a number by itself."""
+    toks = [t for t in _tokenize(text, 0) if t.kind not in ("sep", "break")]
+    if not toks or any(t.kind not in ("digit", "numeral") for t in toks):
+        return ""
+    digits = "".join(t.val for t in toks)
+    return digits if 0 < len(digits) < min_run else ""
+
+
 def tidy_findings(findings: Sequence[Finding]) -> list[Finding]:
-    """Two clean-ups, applied to every list extract_intel returns:
+    """Three clean-ups, applied to every list extract_intel returns:
     1. the same kind and value found twice (a number said again within one turn) is kept once, at its first mention;
-    2. an unlabelled digit run ("ambiguous") that is just a piece of a longer number found in the same list is dropped.
+    2. an unlabelled digit run ("ambiguous") that is just a piece of a longer number found in the same list is dropped;
+    3. a digit run that was NOT labelled by a keyword and is a piece of a longer number of the same kind is dropped.
     A DIFFERENT number is never merged: only an identical value, or a strict piece of a longer one."""
     seen: set[tuple[str, str]] = set()
     unique: list[Finding] = []
@@ -555,7 +590,8 @@ def tidy_findings(findings: Sequence[Finding]) -> list[Finding]:
         unique.append(f)
     return [f for f in unique
             if not (f.kind == "ambiguous"
-                    and redundant_fragment(f.value, [(g.kind, g.value) for g in unique if g is not f and g.kind in DIGIT_KINDS_TIDY]))]
+                    and redundant_fragment(f.value, [(g.kind, g.value) for g in unique if g is not f and g.kind in DIGIT_KINDS_TIDY]))
+            and not redundant_copy(f, [(g.kind, g.value) for g in unique if g is not f])]
 
 
 # --------------------------------------------------------------------------- the top-level call

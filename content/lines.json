@@ -152,10 +152,12 @@
       "states": ["any"],
       "goal": "Used when nothing matches: keep the caller talking without inventing a stage.",
       "variants": [
-        "Haan? Kya kaha beta? Zara dheere boliye, sunai nahin diya.",
-        "Achha achha... samajh nahin aaya, ek baar phir se boliye.",
         "Hello? Line kat kat ke aa rahi hai, kya bola aapne?",
-        "Haan ji haan ji, main sun raha hoon, aap boliye aage."
+        "Haan ji haan ji, main sun raha hoon, aap boliye aage.",
+        "Achha, toh iske baad mujhe kya karna hoga? Zara samjhaiye.",
+        "Theek hai ji, main samajhne ki koshish kar raha hoon. Phir kya hoga?",
+        "Ek minute, yeh sab main kaagaz par likh leta hoon. Aage bataiye.",
+        "Arre, yeh toh badi baat lag rahi hai. Ab aap hi bataiye, kya karun?"
       ]
     }
   }

@@ -926,6 +926,77 @@ The fragment clean-up only drops unlabelled "ambiguous" runs, so a labelled `exp
 8. *Let the caller talk over Uncle (barge-in)* (value high, effort high: needs echo handling, headphones only, a new test). Not for now.
 9. If strays recur: send one saved clip straight to Prisma and compare, before touching the pacer.
 
+## After the friend session: one small fixes stop (2 Nov 2026; dev data, not a test)
+
+Five fixes from the list above, each with a test taken from the logged friend-session text (`tests/test_friend_session.py`, plus one
+live test and edits to three older tests). The exit rule and the red-team runner were NOT started; cancelling a reply when the caller
+starts first, and barge-in, were not done. Nothing was run against Gnani or Gemini.
+
+1. **Stall lines** (`content/lines.json`). `generic_stall` now has 6 lines, not 4: one line-cut complaint ("Hello? Line kat kat ke..."),
+   one neutral ("Haan ji haan ji, main sun raha hoon, aap boliye aage"), and four that react or ask for the next step ("Achha, toh iske
+   baad mujhe kya karna hoga?", "Theek hai ji, main samajhne ki koshish kar raha hoon. Phir kya hoga?", "Ek minute, yeh sab main kaagaz par
+   likh leta hoon. Aage bataiye.", "Arre, yeh toh badi baat lag rahi hai. Ab aap hi bataiye, kya karun?"). Polite register, no digits, no
+   request for money or codes; `python -m mirage.lines` says "No problems found". The two "I did not hear" lines the friend heard most
+   ("Kya kaha beta? ... sunai nahin diya" and "Achha achha... samajh nahin aaya") are gone. **The lint caps are now reached:** 6 variants
+   per tactic and 60 lines in all (it was 58). More variety needs a decision on those caps, or a second stall tactic.
+2. **Negation** (`mirage/negation.py`, the `negation` block in `content/stage_rules.json`, `score_text_ex` and `detect_signals` in
+   `fsm.py`). A payment (S3) or pressure/code (S4) keyword, and the signals `ask_otp`, `ask_credential`, `ask_install`, is ignored when a
+   warning sits close: a prohibition word (mat, never, don't, do not, should not, no need) up to 3 words before it, or up to 10 after it
+   *if a request verb follows that word within 2 words* (the window crosses a full stop on purpose); a plain "nahin / not" counts only
+   when a request verb follows it within 2 words ("payment nahin karni chahiye") or after "zaroorat" ("karne ki zaroorat nahin hai").
+   Ignored keywords are shown in the stage reasons ("S3: ignored Payment (warned against by 'मत')"). Tests: call 2's "Payment ...
+   आप ऐसे मत कर करिएगा" no longer moves S0 to S3; call 4's "payment reflect नहीं हुआ" still does; call 1's, call 2's and call 3's
+   other warnings and the two OTP warnings are ignored; "apna OTP bataiye", "payment kar dijiye", the threat "Payment नहीं करेंगे तो
+   arrest" and "Payment कीजिए, tension मत लीजिए" still count. **Known limits:** a threat worded with a request verb ("payment nahin karna
+   toh arrest") is read as a warning; and call 1's S3 move still happens, because its FIRST sentence ("payment demand का reference बता
+   सकता हूँ") has a payment word with no warning next to it.
+3. **Digit wait** (`CallBrain.reply_wait_s`). The 1.8 s wait now applies only when the unanswered text actually ends on a digit.
+   `awaiting_digits` is still set after an ask but no longer lengthens the wait. A dictation still waits, because its pieces end on digits.
+4. **Hang-up words** (S5, weight 2.0 = the minimum): "call end", "call close", "कॉल एंड", "कॉल क्लोज", "कॉल बंद". Test: call 1's and
+   call 2's lines now give S5 and `goodbye_wrap`; "call kar raha hoon" does not.
+5. **Across adjacent turns** (`extract.py`, `fsm.py`).
+   - *Label hint:* if a turn ENDS on a label ("...Case reference"), the next turn's number is read as that kind. It comes out as
+     `case`, confidence `expected`, needs confirmation (labelled, but not by a keyword in its own turn). The hint lasts one turn, and a
+     keyword in the number's own turn still wins.
+   - *Lone digit:* if Uncle read back the start of a number and the next turn is only one or two digit words ("चार।"), they are checked
+     against the digits that should come next; if they match and complete the number, the held number is marked confirmed. If they do not
+     match, or there was no read-back, nothing changes (they are not made into a number).
+   - *Suffix duplicate:* a number that is not keyword-labelled and is a piece of a longer number of the same kind that we hold ("1234" next
+     to "00001234") is no longer a second card, and no longer triggers a second read-back.
+   - *Summary:* the turn that ends the call is recorded before `summary.json` is written (call 5 said 24 turns, there were 25). A live
+     test fails on the old code.
+
+**Checks.** 613 tests pass (585 before this stop plus 28 new ones); `python -m mirage.lines` and `python -m mirage.safety` print "No problems
+found". Stage sets, before and after, counts only (the friend's set 3 file was not opened): invented 41 of 41 and 41 of 41; owner set 1 25
+of 27 and 25 of 27; owner set 2 6 of 18 and 6 of 18; friend set 3 12 of 20 and 12 of 20. Unchanged, so the negation rule and the S5 words
+did not move any of those lines (they are single lines with no warnings, which is also why they cannot show the benefit).
+
+**Replay of the five friend calls, before and after** (offline `mirage.replay` on the saved transcripts and times, so the same caller
+words are fed to the old and the new brain; these are dev data, one friend, and a replay does not model the half-duplex mute, so its
+numbers differ a little from the live logs):
+
+| call | stage path before | stage path after | generic_stall before | after |
+|---|---|---|---|---|
+| 1 | S0 S1@5 S3@17 | S0 S1@5 S3@17 S5@21 | 10 of 21 (47.6%) | 12 of 21 (57.1%) |
+| 2 | S0 S3@12 | S0 S5@16 | 10 of 16 (62.5%) | 12 of 16 (75.0%) |
+| 3 | S0 S1@2 | S0 S1@2 | 10 of 18 (55.6%) | 11 of 18 (61.1%) |
+| 4 | S0 S3@7 | S0 S3@7 | 15 of 21 (71.4%) | 15 of 21 (71.4%) |
+| 5 | S0 S1@10 S5@25 | S0 S1@10 S5@25 | 16 of 25 (64.0%) | 16 of 25 (64.0%) |
+| all | | | 61 of 101 (60.4%) | 66 of 101 (65.3%) |
+
+- **The generic_stall share went UP, not down** (60.4% to 65.3%). That is what the fixes imply, not a surprise: Uncle no longer answers
+  warnings with payment or code tactics (call 2 turns 12 to 14, call 3 turn 17 became stalls), and in call 1 he now knows he holds the
+  case number, so he no longer asks for it again (turns 15 and 16 became stalls). The share of stalls that are an "I did not hear" line
+  fell from 75% (46 of 61) to 17% (11 of 66), and from 47% of all replies to 11%. The share of stalls is the wrong number to chase; what
+  the stall says is what changed. Distinct Uncle lines went to 27 of 101 replies.
+- **Changed tactics:** 9 of 101 turns (call 1: turns 9, 15, 16, 21; call 2: turns 12, 13, 14, 16; call 3: turn 17). Changed stage: call 2
+  turns 12 to 16 (it no longer reaches S3) and call 1 and call 2 end in S5 on "call end" and "call close", where the live calls ended
+  by hang-up. Nothing else moved: calls 4 and 5 have the same stage path and tactics.
+- **The one read-back the gate used to refuse** (this replay, call 1 turn 9, "Haan ji? Samajh nahin aaya, phir se boliye", tactic
+  gate_fallback) is gone, because the repeat "1234" is no longer a second finding. In this replay turn 8 also shows the label carry at
+  work: "Case reference" ended turn 7, so the next turn's `00001234` came out as a `case` instead of `ambiguous`.
+- Not changed, deliberately: the lines are still a handful; the stall is still a stall. The next lever is stage-aware stall lines.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).

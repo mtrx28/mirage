@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 
 import pytest
 
@@ -155,8 +156,19 @@ def test_an_obstacle_tactic_without_its_trigger_is_caught():
 
 def test_a_tactic_with_too_few_variants_is_caught():
     bank = load_lines()
-    kept = tuple(ln for ln in bank.lines if ln.id != "generic_stall_04")
+    drop = {"generic_stall_04", "generic_stall_05", "generic_stall_06"}
+    kept = tuple(ln for ln in bank.lines if ln.id not in drop)
     assert any("generic_stall: 3 variants" in p for p in lint(dataclasses.replace(bank, lines=kept)))
+
+
+def test_most_generic_stall_lines_move_the_call_on_instead_of_saying_uncle_did_not_hear():
+    # In the friend session (staged role-play) 63 of 101 replies were generic stalls, and 3 of the 4 stall lines said "I did not
+    # hear", to a caller who was perfectly clear. At most a third may complain about the line; at least half must ask for the next step.
+    stalls = [ln.text for ln in load_lines().tactic_lines("generic_stall")]
+    complaint = re.compile(r"sunai nahin|samajh nahin|kya kaha|kya bola|line kat", re.IGNORECASE)
+    next_step = re.compile(r"(aage|kya karna|kya karun|kya hoga|phir kya)", re.IGNORECASE)
+    assert sum(bool(complaint.search(t)) for t in stalls) <= len(stalls) / 3
+    assert sum(bool(next_step.search(t)) for t in stalls) >= len(stalls) / 2
 
 
 # ---------------------------------------------------------------- the checker catches a bad persona sheet

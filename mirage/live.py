@@ -183,6 +183,17 @@ class LiveCall(CallSession):
     async def _reply(self) -> None:
         self._replying = True
         rec: dict[str, Any] = {"interrupted": True}
+        recorded = False
+
+        def record_turn() -> None:
+            # once only, and BEFORE the call is finished: _finish writes summary.json, which counts the turn records
+            # (friend session: the goodbye turn that ended call 5 was missing from the summary's counts)
+            nonlocal recorded
+            if not recorded:
+                recorded = True
+                self.turn_records.append(rec)
+                self.log.record("turns", **rec)
+
         try:
             now = self.log.now()
             pending = self.sched.pending()
@@ -222,6 +233,7 @@ class LiveCall(CallSession):
             if plan.text:
                 await self._say(plan, rec)
             if (plan.end_call or self.brain.state.ended) and not self._ending and not self._ending_reason:
+                record_turn()
                 await self._finish("uncle_ended" if plan.text else "gate_ended")
         except asyncio.CancelledError:
             raise
@@ -229,10 +241,10 @@ class LiveCall(CallSession):
             log.exception("a reply failed")
             self.log.event("internal_error", error=repr(e)[:300])
             await self.notify({"type": "notice", "message": f"Something went wrong while Uncle was replying ({type(e).__name__}); the call was ended. See the call's log."})
+            record_turn()
             await self._finish("internal_error")
         finally:
-            self.turn_records.append(rec)
-            self.log.record("turns", **rec)
+            record_turn()
             self._replying = False
             self._reschedule()
 

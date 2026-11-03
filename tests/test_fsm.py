@@ -319,8 +319,11 @@ def test_digit_mode_waits_longer_and_the_wait_is_configurable():
     brain.hear("mera number hai chaar saat do nau ek", 20.0, 2.0)          # ends in the middle of a number
     assert brain.reply_wait_s() == 1.8
     brain.respond()
-    after_readback = brain.state.awaiting_digits
-    assert after_readback and brain.reply_wait_s() == 1.8                  # Uncle asked for the rest: still waiting
+    assert brain.state.awaiting_digits                                     # Uncle asked for the rest ...
+    brain.hear("Sir ek minute line par rahiye", 30.0, 2.0)                 # ... and the caller said something with no digits:
+    assert brain.reply_wait_s() == FSMConfig().normal_wait_s               # no digit wait (friend session: 8 of 10 such turns paid 1.5 s for nothing)
+    brain.hear("chaar do", 31.0, 1.0)                                      # but a piece that ends on digits waits for the rest
+    assert brain.reply_wait_s() == 1.8
     assert CallBrain(config=FSMConfig(digit_wait_s=2.2)).cfg.digit_wait_s == 2.2
     slow = CallBrain(config=FSMConfig(digit_wait_s=2.2))
     slow.hear("ek do teen", 5.0, 1.0)
@@ -524,7 +527,7 @@ def test_the_runner_uses_the_gate_by_default_and_shows_what_it_did():
 
 def test_the_runner_joins_a_dictation_given_with_plus():
     out = run_runner("hello\n+ account number hai chaar zero zero teen\nnau ek aath do saat\n")
-    assert "400391827" in out and "digit mode" in out
+    assert "400391827" in out                  # (the runner no longer shows "digit mode" here: the long wait now depends on the NEXT text ending on a digit)
 
 
 def test_the_runner_stays_off_the_llm_unless_asked():
