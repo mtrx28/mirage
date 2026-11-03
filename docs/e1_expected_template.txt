@@ -1,0 +1,24 @@
+# E1 expected numbers: fill in, then save a copy as data/e1/expected.txt (data/ is git-ignored) and run:
+#
+#   python -m mirage.e1 data/e1/expected.txt <call id> [<call id> ...]
+#
+# One number per line:   number | label | style | speaker [| call id]
+#   number   exactly what you SAY (digits; spaces and hyphens are ignored; keep leading zeros)
+#   label    what the extractor should call it: phone, case or account
+#   style    one_digit_per_pause  (one digit, a pause, the next digit)   or   natural_groups  (in the groups you would normally say)
+#   speaker  owner or friend (any word; the counts are grouped by it)
+#   call id  optional; if you give it, the number is only looked for in that call (give every call id used here on the command line too)
+#
+# Say each number ONCE per call. The extractor keeps one finding per label and value in a call, so a number said twice in the same call
+# can match only once. Write numbers in the order you say them. If you misspeak, leave the line out and say so, rather than editing the number.
+# Stay with invented numbers: phones that start 0000, case numbers of 5 to 8 digits, account-style numbers of 9 to 18 digits (avoid exactly
+# 12, which looks like an Aadhaar number, and do not use Uncle's own invented phone or account number).
+#
+# Lines below start with # so they are ignored. Remove the # from a line to use it, or write your own (these are only examples):
+#
+# 0000274196        | phone   | one_digit_per_pause | owner
+# 0000358261        | phone   | natural_groups      | friend
+# 47291             | case    | natural_groups      | owner
+# 8120364           | case    | one_digit_per_pause | friend
+# 71936204853172    | account | natural_groups      | owner
+# 502817364095183   | account | one_digit_per_pause | friend | 20261104_101500_ab12

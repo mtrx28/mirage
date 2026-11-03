@@ -7,7 +7,7 @@ too small to quote. Each section says what the data is, how much there is, and w
 
 | Experiment | Planned in the blueprint | What exists | Size | Data type |
 |---|---|---|---|---|
-| E1 digit fidelity | 60 clips, 4 noise levels, 3 output modes | **Not run.** A handful of anecdotal samples only | about 11 digit strings, 5 different set-ups | owner's live speech, one clean clip |
+| E1 digit fidelity | 60 clips, 4 noise levels, 3 output modes | **Not run.** A handful of anecdotal samples only; a small ~20-number live test has its scoring script built and is **waiting for the numbers** | about 11 digit strings, 5 different set-ups | owner's live speech, one clean clip |
 | E2 latency | p50 and p95 on every test call | Measured on the live loop | 101 replies in 5 calls, plus 7 in a solo call | friend role-play, one computer |
 | E3 FSM vs LLM simulator | simulator comparison | **Dropped** (Gemini daily limit) | none | none |
 | E4 red-team | 30 adversarial lines | 30 lines run, 15 by the model that built the gate and 15 by the friend | 30 lines x 7 states, plus 189 model probes | text, mocked model |
@@ -32,6 +32,24 @@ else. **What it does not show:** any noise level or degraded-audio result, any d
 comparison with Prisma v2.5, how often real callers dictate digit by digit, or any exact-match rate. The main finding is qualitative: **capture
 quality dominates, and slow single-digit dictation is Prisma's and our turn logic's weak spot.** E1 should be run properly before any digit
 claim is made.
+
+### E1 small test: the scoring side is built, and it has not been run
+
+**Status: not run. No numbers have been recorded yet, so this page gives no result for it.** When the owner has said about 20 numbers in a few live calls and
+provided the list, the counts will be added here, labelled as below.
+
+**What it will cover.** About 20 invented numbers (phone numbers, case numbers and account-style numbers) said by two people (the owner and the friend) in a few
+live calls, in two styles: one digit per pause, and in natural groups. `python -m mirage.e1 <expected file> <call id> ...` (template: `docs/e1_expected_template.txt`)
+compares each expected number with what the extractor **stored during that call** (`findings.json`; the extractor is not re-run, so it scores the system as it was
+then). For each number it says one of: **captured exactly** (same full value and same label), **captured with the wrong label** (same full value, for example
+`ambiguous` instead of `phone`), **partly captured** (a piece of it, a longer string that contains it, or one digit wrong), or **missed**. A number counts as captured
+only if its **full value** matches. It prints counts out of attempted, overall and per style, speaker and label, and lists every failure with what was stored instead.
+Counts only, no percentages.
+
+**What it will not show.** It measures the whole chain at once (the microphone, Prisma, our turn-taking and the extractor), not Prisma's accuracy alone, so a miss
+can have any of those causes (the failure list shows the stored value, which helps tell them apart but does not settle it). It is about 20 numbers, two speakers, one
+set-up, quiet-room live speech: **no noise levels, no output modes, no Tamil-English, no comparison with another model, no rate.** It is staged, small-sample development
+data and is not the 60-clip Digit Fidelity test in the blueprint. Numbers shorter than three digits are never stored by the extractor, so they are not scored.
 
 ## E2: latency
 

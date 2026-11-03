@@ -1316,6 +1316,16 @@ disclosure, integrity. Call 1's PDF is 2 pages. I could not render the PDF to an
 the embedded fonts were read from the PDF; the owner opens the PDF. `docs/results.md` collects E1, E2, E4 and E5 with sample sizes, data type and limits; E1 is stated as
 too few samples to quote, E3 as dropped.
 
+## E1 small test: scoring side only (3 Nov 2026; not run)
+
+`mirage/e1.py`, `tests/test_e1.py`, `docs/e1_expected_template.txt`. `python -m mirage.e1 data/e1/expected.txt <call id> [...] [--json OUT]` takes the numbers the owner
+says (one per line: number | label | style | speaker [| call id]) and compares them with each call's logged `findings.json` only; the extractor is not re-run (a test makes
+`extract_intel` raise, and the module does not import it). Verdicts: exact (full value and label), wrong_label (full value, other label), partial (a run of at least 3 digits
+and at least half of the number is shared: a piece, a longer string containing it, or one digit wrong) and missed. A number counts as captured only if the full value matches.
+Counts out of attempted overall and by style, speaker and label, with every failure listed with what was stored; no percentages; the output starts with a staged, small-sample
+dev-data banner. Each finding is used for at most one expected number, and a number listed twice in one call is warned about, because the extractor keeps one finding per label
+and value. Not run: no numbers have been recorded. `docs/results.md` has an E1 section saying so.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
