@@ -1,0 +1,200 @@
+{
+  "schema": "mirage-evidence-packet/0.1",
+  "label": "STAGED DEMO: role-played call with SYNTHETIC data. The caller is a volunteer, not a real scammer; Uncle's name, phone number, account and bank are invented. Nothing in this packet describes a real person or a real crime.",
+  "data_status": {
+    "staged": true,
+    "synthetic": true,
+    "real_scammer": false
+  },
+  "call_id": "20261104_124958_c42d",
+  "started_at": "2026-11-04T07:19:58+00:00",
+  "duration_s": 99.8,
+  "language": "hi-IN",
+  "languages_detected": {
+    "hi-IN": 14,
+    "en-IN": 4
+  },
+  "transcript_format": "codemix",
+  "scenario": "digital_arrest",
+  "scenario_note": "The scenario is the project's own keyword guess (digital_arrest, bank_kyc), or 'undecided'; it is not a finding about the caller.",
+  "agent": {
+    "name": "Rajesh Uncle (fictional persona)",
+    "is_automated": true
+  },
+  "intel": [
+    {
+      "kind": "case",
+      "value": "82614",
+      "confidence": "keyword",
+      "needs_confirmation": false,
+      "valid": true,
+      "reason": "",
+      "candidates": [],
+      "suggested": null,
+      "quote": "आठ | दो | छह | एक | चार",
+      "t": 30.42
+    },
+    {
+      "kind": "phone",
+      "value": "0000318652",
+      "confidence": "keyword",
+      "needs_confirmation": false,
+      "valid": true,
+      "reason": "synthetic number (00 prefix)",
+      "candidates": [],
+      "suggested": null,
+      "quote": "zero | जीरो | 00 | तीन | एक | आठ | छह | पाँच दो",
+      "t": 49.2
+    },
+    {
+      "kind": "vpa",
+      "value": "verifyofficer123@okaxis",
+      "confidence": "heard",
+      "needs_confirmation": true,
+      "valid": true,
+      "reason": "handle joined from the words heard, 'OK axis': confirm it",
+      "candidates": [],
+      "suggested": null,
+      "quote": "verify officer one | Two three at OK axis",
+      "t": 85.33
+    }
+  ],
+  "intel_summary": {
+    "count": 3,
+    "by_confidence": {
+      "heard": 1,
+      "keyword": 2
+    },
+    "needs_confirmation": 1,
+    "confidence_is": "the extractor's own label, copied from the call's findings; not a probability, and nothing has been upgraded or rescored",
+    "labels": {
+      "keyword": "a specific word (case, account, phone ...) came just before the number",
+      "heard": "an id or code as heard (UPI id, IFSC, spelled letters)"
+    },
+    "t_is": "seconds from the start of the call at which the transcript carrying the quote arrived; not when the words were spoken"
+  },
+  "payment_intel": [
+    {
+      "type": "upi_vpa",
+      "kind": "vpa",
+      "value": "verifyofficer123@okaxis",
+      "confidence": "heard",
+      "needs_confirmation": true,
+      "valid": true,
+      "reason": "handle joined from the words heard, 'OK axis': confirm it",
+      "candidates": [],
+      "suggested": null,
+      "quote": "verify officer one | Two three at OK axis",
+      "t": 85.33
+    }
+  ],
+  "payment_intel_note": null,
+  "stage_timeline": [
+    {
+      "stage": "S0",
+      "from_s": 0.0,
+      "to_s": 20.72
+    },
+    {
+      "stage": "S1",
+      "from_s": 20.72,
+      "to_s": 74.39,
+      "entered_on_turn": 2,
+      "entered_because": [
+        "S1: arrest +2"
+      ]
+    },
+    {
+      "stage": "S3",
+      "from_s": 74.39,
+      "to_s": 99.8,
+      "entered_on_turn": 5,
+      "entered_because": [
+        "S1: verification +1",
+        "S3: deposit +1.5, refundable +1.5, भेज* +1.5"
+      ]
+    }
+  ],
+  "stage_timeline_note": "Stages and intel are as the brain recorded them DURING the call, by the rules in force then; a later change to the rules does not alter a saved call. A stage starts at the time of Uncle's reply on the turn where the keyword rules moved it, not when the caller said the words; 'entered_because' lists the rule hits.",
+  "transcript_native": [
+    {"t": 6.344, "utterance_id": "u5c3fd686", "language": "hi-IN", "audio_s": 3.636, "text": "नमस्ते, मैं CBI से बोल रहा हूँ।"},
+    {"t": 9.063, "utterance_id": "u936a7e48", "language": "hi-IN", "audio_s": 2.752, "text": "आपके नाम के parcel में drugs मिले हैं।"},
+    {"t": 20.406, "utterance_id": "ub709cb61", "language": "hi-IN", "audio_s": 4.82, "text": "यह digital arrest का matter है। आपको अभी line पर रहना होगा।"},
+    {"t": 30.422, "utterance_id": "u6c588c75", "language": "en-IN", "audio_s": 2.484, "text": "case number है आठ"},
+    {"t": 31.563, "utterance_id": "ub2b22a9a", "language": "hi-IN", "audio_s": 1.248, "text": "दो।"},
+    {"t": 32.703, "utterance_id": "u1a13bee5", "language": "hi-IN", "audio_s": 1.184, "text": "छह"},
+    {"t": 33.922, "utterance_id": "u832fd162", "language": "hi-IN", "audio_s": 1.184, "text": "एक।"},
+    {"t": 34.938, "utterance_id": "u6ed7871f", "language": "hi-IN", "audio_s": 1.056, "text": "चार"},
+    {"t": 49.203, "utterance_id": "u605c2fdb", "language": "hi-IN", "audio_s": 4.564, "text": "मेरा direct number लिख लीजिए। phone number है zero"},
+    {"t": 50.172, "utterance_id": "u6d96db90", "language": "hi-IN", "audio_s": 1.248, "text": "जीरो"},
+    {"t": 52.485, "utterance_id": "ubd3b660f", "language": null, "audio_s": 2.24, "text": "00"},
+    {"t": 53.797, "utterance_id": "ua1452260", "language": "hi-IN", "audio_s": 1.408, "text": "तीन।"},
+    {"t": 54.922, "utterance_id": "u7bb92c1c", "language": "hi-IN", "audio_s": 1.088, "text": "एक।"},
+    {"t": 55.922, "utterance_id": "u7547f300", "language": "hi-IN", "audio_s": 1.024, "text": "आठ"},
+    {"t": 56.985, "utterance_id": "ucf7d64de", "language": "hi-IN", "audio_s": 1.024, "text": "छह।"},
+    {"t": 58.813, "utterance_id": "ub1faca98", "language": "hi-IN", "audio_s": 1.856, "text": "पाँच दो"},
+    {"t": 74.063, "utterance_id": "ua23293f5", "language": "en-IN", "audio_s": 4.628, "text": "Verification के लिए refundable security deposit भेजना होगा।"},
+    {"t": 85.328, "utterance_id": "u9421c155", "language": "en-IN", "audio_s": 4.308, "text": "UPI ID है verify officer one"},
+    {"t": 89.656, "utterance_id": "uebbbf4b8", "language": "en-IN", "audio_s": 3.584, "text": "Two three at OK axis"}
+  ],
+  "transcript_latin": null,
+  "transcript_latin_reason": "Not available. These calls were transcribed with Prisma's 'codemix' format only (Devanagari and Latin mixed, as the service returned it). A Latin-letter copy needs the service's own transliteration, which was not requested, and no transliteration has been invented here.",
+  "uncle_lines": [
+    {"t": 9.688, "turn": 1, "text": "<coughs> Haan ji boliye beta, main sun raha hoon.", "tactic": "greet_confused"},
+    {"t": 21.141, "turn": 2, "text": "Police? CBI? Arre baap re, maine toh kuch galat nahin kiya.", "tactic": "alarm"},
+    {"t": 37.141, "turn": 3, "text": "Achha, ye likha: 8 2 6. Aage ka phir se boliye beta?", "tactic": "readback_partial"},
+    {"t": 60.86, "turn": 4, "text": "Haan, 0 0 0, 0 3... bas yahin tak likha. Baaki dobara bataiye.", "tactic": "readback_partial"},
+    {"t": 74.703, "turn": 5, "text": "Main pensioner hoon beta, par kar dunga. Kis account mein bhejun?", "tactic": "willing_ask_payment"},
+    {"t": 90.266, "turn": 6, "text": "Mujhe sunai kam deta hai, account number thoda dheere bataiye na beta.", "tactic": "ask_detail_slow"}
+  ],
+  "capture": {
+    "caller_audio_muted_s": 31.4,
+    "note": "While Uncle's voice played, the microphone audio sent to the speech service was silenced, so nothing the caller said during those seconds is in the transcript."
+  },
+  "disclosure": {
+    "uncle_is_automated": true,
+    "identity_questions": {
+      "deflected": 0,
+      "answered_honestly": 0
+    },
+    "emergency_disclosures": 0,
+    "said_automated_assistant": false,
+    "first_said_at_s": null,
+    "gate_actions": {},
+    "policy": "Uncle is an automated agent and never says he is a person. A sincere 'are you an AI?' gets the honest answer at once when the call shows little evidence of a scam; with strong evidence he deflects up to twice in character, then answers honestly. This is the project's own policy, not a legal opinion."
+  },
+  "ending": {
+    "end_reason_raw": "hangup",
+    "ended_at_s": 99.8,
+    "last_turn_tactic": "ask_detail_slow",
+    "last_turn_stage_reasons": [],
+    "type": "caller_side_hangup",
+    "detail": "The call page's Hang up ended the call. The log cannot say who pressed it; in staged calls the person playing the caller sits at the same computer."
+  },
+  "audio": {
+    "present": false
+  },
+  "source_files": {
+    "summary.json": "79bb48b476932c629ff6aea74924c74c60efe7120ab81f8a8bc2954b077f10ac",
+    "events.jsonl": "08ed880d53f9a0fd16ecd894136debd1a7cf717f4baacac7c4e5fc734ab63058",
+    "transcripts.jsonl": "6a46d32a4089a7964bee9458638a1682a0ebbb0a66caecce5dcfe561a0fc07f2",
+    "turns.jsonl": "542454e2100b56ae2f4b4fadfe342a68daf11eb07acc8b6c0ddde8b979658580",
+    "findings.json": "8dc3843907e9002379e1bfe2f8e3a2e418e306a23bfcaa0da97ae11cf70a2515"
+  },
+  "limitations": [
+    "Staged, role-played call; it says nothing about real scammers.",
+    "The transcript is the speech service's codemix text as received. Digits and words can be misheard; items with needs_confirmation true were not confirmed by the caller.",
+    "Intel values are as heard. A value that is a piece of a longer one of the same kind is flagged possibly_part_of, not merged.",
+    "Times are seconds from the start of the call as measured by the server."
+  ],
+  "generated_at": "2026-11-04T13:03:59+05:30",
+  "integrity": {
+    "sha256": "55d1d80b2e51418144c52f87c4c74528ef457f56da148255ba274b47a3a1a61f",
+    "generated_at": "2026-11-04T13:03:59+05:30",
+    "algorithm": "sha256",
+    "covers": "the canonical JSON of this packet without the integrity block (generated_at is inside the covered part)",
+    "canonicalization": "UTF-8 JSON, keys sorted, separators ',' and ':', no ASCII escaping",
+    "verify": "python -m mirage.packet verify <this file>",
+    "note": "The hash only shows that this file is unchanged since it was generated. No claim is made about legal admissibility."
+  }
+}

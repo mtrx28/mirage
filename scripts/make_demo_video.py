@@ -1,7 +1,7 @@
-"""Post-production for the demo video of one staged call (3 Nov 2026). Runs locally: ffmpeg + Pillow, no network, no Gnani, no Gemini.
+"""Post-production for the demo video of one staged call. Runs locally: ffmpeg + Pillow, no network, no Gnani, no Gemini.
 
-    python scripts/make_demo_video.py            # render everything into data/video/
-    python scripts/make_demo_video.py --plan     # print the cut list, timings and caption windows only
+    python scripts/make_demo_video.py --call <id> --recording <mp4> --music build     # render into data/video/
+    python scripts/make_demo_video.py --call <id> --recording <mp4> --plan            # print the offset, cuts and caption/toast times only
 
 What it does, in order:
   1. cuts the screen recording to the call (no speed-ups; only silences where nobody speaks are shortened),
@@ -9,9 +9,14 @@ What it does, in order:
   3. puts it on a 1080x1350 (4:5) canvas with a small STAGED DEMO mark, an evidence counter, and English subtitles,
   4. adds a 3 s title card and a 3 s end card, and writes an H.264 + AAC mp4 with quiet synthesized background music.
 
-The subtitle words and times come from the call's own logs (data/calls/<id>/). The English is a translation written by hand
-for this video; the Hindi lines are not shown. The recording and the call log share one clock once the offset below is added:
-the six Uncle lines start in the recording's audio 0.00 to 0.06 s after (log time + OFFSET_S).
+Nothing about a call is placed by hand. From data/calls/<id>/ and the recording's own audio it works out:
+  - the offset between the call log's clock and the recording's (the six Uncle line starts in the log are matched to the sound onsets in the audio),
+  - the cuts (quiet stretches of 1.6 s or more that do not end at an Uncle line; his waiting time is never shortened),
+  - the subtitle windows (Uncle: events.jsonl; caller: transcripts.jsonl arrival time, latency and audio length, snapped to the sound),
+  - the green banners and the evidence dots (the first turn in turns.jsonl whose findings contain each item, at Uncle's line start in events.jsonl),
+  - the full UPI card shown beside the page (value, badges and quote from that finding in findings.json).
+Only the English wording is written by hand: ENGLISH_CALLER (by transcript text) and ENGLISH_UNCLE (by Uncle's line). A line with no English
+stops the script and names the line, so nothing is shown that was not translated.
 """
 from __future__ import annotations
 
@@ -27,12 +32,13 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "recording" / "Mirage_ Rajesh Uncle - Google Chrome 2026-11-03 17-41-31.mp4"
-CALL_ID = "20261103_174137_097a"
+sys.path.insert(0, str(ROOT))          # for mirage.extract (its digit words), also under python -I
+SRC = ROOT / "recording" / "Mirage_ Rajesh Uncle - Google Chrome 2026-11-04 12-49-47.mp4"
+CALL_ID = "20261104_124958_c42d"
 OUT = ROOT / "data" / "video"
 WORK = OUT / "work"
 
-OFFSET_S = 7.15          # recording time = call-log time + this (measured on the six Uncle onsets: 7.12 to 7.21)
+OFFSET_S = 0.0           # recording time = call-log time + this; set by configure() from the sound
 FPS = 30
 W, H = 1080, 1350
 STRIP_H, UI_X, UI_Y, UI_W, UI_H = 116, 16, 140, 1048, 966
@@ -42,48 +48,36 @@ CROP = (538, 210, 1336, 1230)             # x, y, w, h of the page inside the 24
 TITLE_S, END_S = 3.0, 3.0
 FADE_S = 0.2
 
-# Call-log seconds kept. Each cut removes the middle of a stretch (2 to 3 s) where nobody spoke and Uncle was not waiting to answer:
-# the caller getting ready to speak after Uncle finished. The waits BEFORE Uncle's lines are kept as they were, so his reply time is real.
-KEEP = [(1.9, 13.47), (15.57, 25.70), (27.66, 41.44), (42.83, 66.31), (68.29, 77.82), (79.51, 94.30)]
-
-# Snap every cut to a whole frame of the 30 fps picture so that each piece is an exact number of frames long.
-KEEP = [(round((a + OFFSET_S) * FPS) / FPS - OFFSET_S, round((b + OFFSET_S) * FPS) / FPS - OFFSET_S) for a, b in KEEP]
-
+KEEP: list[tuple[float, float]] = []                 # call-log seconds kept; set by configure()
+CAPTIONS: list[tuple] = []                            # (speaker, start, end, prefix, text, kind, continues); set by configure()
+EVIDENCE: list[tuple] = []                            # (call-log second, label, value, short name); set by configure()
+UPI_CARD: dict = {}                                   # the stored UPI finding as the dashboard card shows it; set by configure()
 CALLER, UNCLE = "caller", "uncle"
-# (speaker, start, end, prefix, text-or-digits, kind, continues): times are call-log seconds. kind "text" is words; "digits" is a number being said.
-CAPTIONS = [
-    (CALLER, 2.80, 8.45, "", "Hello. I'm calling from the CBI. We found drugs in a parcel in your name.", "text", False),
-    (UNCLE, 9.50, 13.45, "", "(coughs) Yes, go ahead, son. I'm listening.", "text", False),
-    (CALLER, 15.85, 19.90, "", "This is a digital arrest matter. You must stay on the line right now.", "text", False),
-    (UNCLE, 21.00, 25.45, "", "Police? CBI? Oh my God! I haven't done anything wrong.", "text", False),
-    (CALLER, 27.90, 30.25, "Case number is", "8", "digits", False),
-    (CALLER, 30.25, 31.30, "Case number is", "8 2", "digits", True),
-    (CALLER, 31.30, 32.55, "Case number is", "8 2 6", "digits", True),
-    (CALLER, 32.55, 33.60, "Case number is", "8 2 6 1", "digits", True),
-    (CALLER, 33.60, 35.00, "Case number is", "8 2 6 1 4", "digits", True),
-    (UNCLE, 36.83, 41.40, "", "Okay, this is what I wrote: 8 2 6. Say the rest again, son?", "text", False),
-    (CALLER, 43.80, 48.45, "", "Write down my direct number. Phone number is zero...", "text", False),
-    (CALLER, 48.50, 49.13, "Phone number", "0", "digits", False),
-    (CALLER, 49.13, 50.26, "Phone number", "0 0", "digits", True),
-    (CALLER, 50.26, 51.78, "Phone number", "0 0 0 0", "digits", True),
-    (CALLER, 51.78, 52.83, "Phone number", "0 0 0 0 3", "digits", True),
-    (CALLER, 52.83, 53.84, "Phone number", "0 0 0 0 3 1", "digits", True),
-    (CALLER, 53.84, 54.84, "Phone number", "0 0 0 0 3 1 8", "digits", True),
-    (CALLER, 54.84, 55.96, "Phone number", "0 0 0 0 3 1 8 6", "digits", True),
-    (CALLER, 55.96, 57.40, "Phone number", "0 0 0 0 3 1 8 6 5 2", "digits", True),
-    (UNCLE, 59.97, 66.25, "", "Yes: 0 0 0, 0 3... that's all I wrote down. Tell me the rest again.", "text", False),
-    (CALLER, 68.45, 72.45, "", "For verification, you must send a refundable security deposit.", "text", False),
-    (UNCLE, 73.60, 77.80, "", "I'm a pensioner, son, but I will pay. Which account should I send it to?", "text", False),
-    (CALLER, 79.75, 83.40, "", "The UPI ID is verify officer one...", "text", False),
-    (CALLER, 83.45, 87.00, "", "...two three, at OK axis.", "text", False),
-    (UNCLE, 88.10, 92.10, "", "I don't hear well. Say the account number a little slower, son.", "text", False),
-]
-# When the dashboard shows each item (read from the video: the intel card appears as Uncle's reply starts), call-log seconds.
-EVIDENCE = [
-    (37.00, "CASE NUMBER CAPTURED", "82614"),
-    (60.00, "PHONE NUMBER CAPTURED", "0000318652"),
-    (88.15, "UPI ID HEARD, TO CONFIRM", "verifyofficer123@OK"),
-]
+
+# The only hand-written part: English for each line. Keys are the transcript text without its final "।", and Uncle's logged line.
+ENGLISH_CALLER = {
+    "नमस्ते, मैं CBI से बोल रहा हूँ": "Hello, I'm calling from the CBI.",
+    "आपके नाम के parcel में drugs मिले हैं": "We found drugs in a parcel in your name.",
+    "यह digital arrest का matter है। आपको अभी line पर रहना होगा": "This is a digital arrest matter. You must stay on the line right now.",
+    "Verification के लिए refundable security deposit भेजना होगा": "For verification, you must send a refundable security deposit.",
+    "UPI ID है verify officer one": "The UPI ID is verify officer one...",
+    "Two three at OK axis": "...two three, at OK axis.",
+}
+# A sentence that ends in digit words: (words to show before the digits or None, label shown above the digits)
+ENGLISH_CALLER_LEAD = {
+    "case number है": (None, "Case number is"),
+    "मेरा direct number लिख लीजिए। phone number है": ("Write down my direct number. Phone number is zero...", "Phone number"),
+}
+ENGLISH_UNCLE = {
+    "<coughs> Haan ji boliye beta, main sun raha hoon.": "(coughs) Yes, go ahead, son. I'm listening.",
+    "Police? CBI? Arre baap re, maine toh kuch galat nahin kiya.": "Police? CBI? Oh my God! I haven't done anything wrong.",
+    "Achha, ye likha: 8 2 6. Aage ka phir se boliye beta?": "Okay, this is what I wrote: 8 2 6. Say the rest again, son?",
+    "Haan, 0 0 0, 0 3... bas yahin tak likha. Baaki dobara bataiye.": "Yes: 0 0 0, 0 3... that's all I wrote down. Tell me the rest again.",
+    "Main pensioner hoon beta, par kar dunga. Kis account mein bhejun?": "I'm a pensioner, son, but I will pay. Which account should I send it to?",
+    "Mujhe sunai kam deta hai, account number thoda dheere bataiye na beta.": "I don't hear well. Say the account number a little slower, son.",
+}
+KIND_NAMES = {"case": ("CASE NUMBER", "CASE NUMBER"), "phone": ("PHONE NUMBER", "PHONE"), "vpa": ("UPI ID", "UPI ID"),
+              "account": ("ACCOUNT NUMBER", "ACCOUNT"), "ifsc": ("IFSC", "IFSC")}
 
 # ------------------------------------------------------------------ palette and type (fonts that ship with Windows)
 INK = (12, 12, 10)
@@ -177,7 +171,7 @@ def caption_windows() -> list[dict]:
 
 
 def evidence_windows() -> list[dict]:
-    return [dict(s=to_main(t), label=label, value=value) for t, label, value in EVIDENCE]
+    return [dict(s=to_main(t), label=label, value=value, short=short) for t, label, value, short in EVIDENCE]
 
 
 # ------------------------------------------------------------------ background, ui mask and ring
@@ -234,13 +228,13 @@ class Strip:
         img = self.base.copy()
         d = ImageDraw.Draw(img)
         if toast is None:
-            for i in range(3):
+            for i in range(len(wins)):
                 cx = UI_X + 18 + i * 26
                 if i < n:
                     d.ellipse((cx - 8, 81, cx + 8, 97), fill=GREEN)
                 else:
                     d.ellipse((cx - 8, 81, cx + 8, 97), outline=EDGE, width=2)
-            tracked(d, UI_X + 100, 95, f"EVIDENCE  {n} / 3", bahn(16, 700), CREAM if n else MUTED, 2)
+            tracked(d, UI_X + 26 * len(wins) + 22, 95, f"EVIDENCE  {n} / {len(wins)}", bahn(16, 700), CREAM if n else MUTED, 2)
             f = bahn(14, 600)
             tracked(d, UI_X + UI_W - tracked_width(self.legend, f, 1.4), 94, self.legend, f, MUTED, 1.4)
         else:
@@ -426,10 +420,12 @@ def end_frame(bg: Image.Image, t: float) -> Image.Image:
         centered(d, y + 100 + dy, name, bahn(80, 380), mix(CREAM, a), 0.5)
         d.line((W / 2 - 40, y + 140 + dy, W / 2 + 40, y + 140 + dy), fill=mix(EDGE, a), width=2)
     a = fade(1.3, 1.7)
-    x = (W - (3 * 26 + 330)) / 2
-    for i in range(3):
+    names = " · ".join(e[3] for e in EVIDENCE)
+    fn = bahn(20, 700)
+    x = (W - (len(EVIDENCE) * 26 + 20 + tracked_width(names, fn, 2.4))) / 2
+    for i in range(len(EVIDENCE)):
         d.ellipse((x + i * 26, 962 + (1 - ease_out(a)) * 12, x + i * 26 + 16, 978 + (1 - ease_out(a)) * 12), fill=mix(GREEN, a))
-    tracked(d, x + 100, 977 + (1 - ease_out(a)) * 12, "CASE NUMBER · PHONE · UPI ID", bahn(20, 700), mix(MUTED, a), 2.4)
+    tracked(d, x + len(EVIDENCE) * 26 + 20, 977 + (1 - ease_out(a)) * 12, names, fn, mix(MUTED, a), 2.4)
     s = fade(1.7, 2.1)
     if s > 0:
         layer = stamp_layer(1.0, s, False)
@@ -443,13 +439,6 @@ def end_frame(bg: Image.Image, t: float) -> Image.Image:
 # ------------------------------------------------------------------ the full UPI card (the recording cuts it off at the bottom of the window)
 POP_X, POP_Y, POP_W, POP_H = UI_X + 12, UI_Y + 361, 677, 232      # sits exactly over the page's "Voice test" card, which never changes in a call
 POP_UI_BOX = (12, 361, 12 + POP_W, 361 + POP_H)                    # the same box in the cropped page picture
-UPI_CARD = dict(
-    value="verifyofficer123@OK",
-    chips=[("confidence: heard", False), ("valid format", False), ("needs confirmation", True)],
-    note="heard as above; a guess, not the value: maybe verifyofficer123@oksbi or verifyofficer123@okaxis or "
-         "verifyofficer123@okicici or verifyofficer123@okhdfcbank",
-    quote="\u201cverify officer one | Two three at OK\u201d at 1:24",
-)
 POP_FROM_S = 0.35        # seconds after the evidence toast starts
 
 
@@ -466,26 +455,50 @@ def wrap_px(text: str, f, width: float) -> list[str]:
 
 
 def upi_card_image() -> Image.Image:
-    """The dashboard's UPI card as the page draws it now, with the part the recording cut off: the needs-confirmation badge, the likely
-    handles (a guess, kept apart from the value) and the quote. The words are the logged finding (value, quote, time) plus the handles
-    the extractor lists for it; nothing here is invented."""
+    """The dashboard's card for the stored UPI finding, with the part the recording cuts off at the bottom of the window: the badges that
+    wrap onto a second row, any guess list, and the quote. Everything comes from UPI_CARD, which comes from findings.json; the card is
+    centred in the box of the page's "Voice test" card, which it covers."""
     k = 3
     img = Image.new("RGBA", (POP_W * k, POP_H * k), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((0, 0, POP_W * k - 1, POP_H * k - 1), 18 * k, fill=(31, 31, 27, 255), outline=AMBER + (210,), width=2 * k)
-    tracked(d, 24 * k, 38 * k, "UPI ID", font("segoeuib.ttf", 14 * k), (160, 158, 148, 255), 1.4 * k)
-    d.text((24 * k, 80 * k), UPI_CARD["value"], font=font("CascadiaMono.ttf", 30 * k, [700]), fill=(240, 240, 235, 255), anchor="ls")
-    x, fc = 24 * k, font("segoeui.ttf", 16 * k)
+    fv, fc, fn, fq = font("CascadiaMono.ttf", 32 * k, [700]), font("segoeui.ttf", 17 * k), font("segoeui.ttf", 18 * k), font("segoeui.ttf", 16 * k)
+    rows: list[tuple] = [("title", 20), ("value", 40)]
+    chip_rows: list[list[tuple[str, bool, float]]] = [[]]
+    x = 0.0
     for text, warn in UPI_CARD["chips"]:
-        w = fc.getlength(text) + 28 * k
-        col = (206, 118, 118, 255) if warn else (92, 90, 82, 255)
-        d.rounded_rectangle((x, 96 * k, x + w, 124 * k), 14 * k, outline=col, width=int(1.5 * k))
-        d.text((x + 14 * k, 116 * k), text, font=fc, fill=(232, 150, 150, 255) if warn else (226, 226, 220, 255), anchor="ls")
-        x += w + 10 * k
-    fn = font("segoeui.ttf", 17 * k)
-    for i, ln in enumerate(wrap_px(UPI_CARD["note"], fn, (POP_W - 48) * k)):
-        d.text((24 * k, (152 + 23 * i) * k), ln, font=fn, fill=(214, 213, 207, 255), anchor="ls")
-    d.text((24 * k, 218 * k), UPI_CARD["quote"], font=font("segoeui.ttf", 15 * k), fill=(160, 158, 148, 255), anchor="ls")
+        w = fc.getlength(text) / k + 30
+        if x + w > POP_W - 48 and chip_rows[-1]:
+            chip_rows.append([])
+            x = 0.0
+        chip_rows[-1].append((text, warn, w))
+        x += w + 10
+    rows += [("chips", 34)] * len(chip_rows)
+    note_lines = wrap_px(UPI_CARD["note"], fn, (POP_W - 48) * k) if UPI_CARD["note"] else []
+    rows += [("note", 25)] * len(note_lines)
+    rows += [("quote", 24)]
+    total = sum(h for _, h in rows) + 6 * (len(rows) - 1)
+    y = (POP_H - total) / 2
+    chip_i = note_i = 0
+    for kind, h in rows:
+        if kind == "title":
+            tracked(d, 24 * k, (y + 15) * k, "UPI ID", font("segoeuib.ttf", 14 * k), (160, 158, 148, 255), 1.4 * k)
+        elif kind == "value":
+            d.text((24 * k, (y + 33) * k), UPI_CARD["value"], font=fv, fill=(240, 240, 235, 255), anchor="ls")
+        elif kind == "chips":
+            cx = 24.0
+            for text, warn, w in chip_rows[chip_i]:
+                col = (206, 118, 118, 255) if warn else (92, 90, 82, 255)
+                d.rounded_rectangle((cx * k, y * k, (cx + w) * k, (y + 29) * k), 14.5 * k, outline=col, width=int(1.5 * k))
+                d.text(((cx + 15) * k, (y + 21) * k), text, font=fc, fill=(232, 150, 150, 255) if warn else (226, 226, 220, 255), anchor="ls")
+                cx += w + 10
+            chip_i += 1
+        elif kind == "note":
+            d.text((24 * k, (y + 19) * k), note_lines[note_i], font=fn, fill=(214, 213, 207, 255), anchor="ls")
+            note_i += 1
+        else:
+            d.text((24 * k, (y + 18) * k), UPI_CARD["quote"], font=fq, fill=(160, 158, 148, 255), anchor="ls")
+        y += h + 6
     return img.resize((POP_W, POP_H), Image.LANCZOS)
 
 
@@ -701,6 +714,206 @@ def make_music(total_s: float, sr: int = 48000) -> np.ndarray:
     return m.astype(np.float32)
 
 
+# ------------------------------------------------------------------ what a call's logs and the recording's sound say
+def read_jsonl(path: Path) -> list[dict]:
+    return [json.loads(l) for l in path.read_text(encoding="utf8").splitlines() if l.strip()]
+
+
+def mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def sound_levels() -> np.ndarray:
+    """Loudness of the recording's audio every 10 ms, in dB."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    raw = WORK / "rec_audio.raw"
+    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(SRC), "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", str(raw)])
+    x = np.fromfile(raw, dtype="<i2").astype(float) / 32768
+    n = len(x) // 160
+    return 20 * np.log10(np.sqrt((x[:n * 160].reshape(n, 160) ** 2).mean(1)) + 1e-9)
+
+
+def estimate_offset(voiced: np.ndarray, uncle_starts: list[float]) -> tuple[float, list[float]]:
+    """recording time minus call-log time. A sound onset (voiced after 0.4 s of quiet) follows each Uncle line start by the same delay; the
+    delay that most Uncle starts agree on (within 0.12 s) is the offset, and the median of those delays is returned."""
+    n = len(voiced)
+    onsets = [i / 100 for i in range(40, n) if voiced[i] and not voiced[i - 40:i].any()]
+    best: list[float] = []
+    for o in onsets:
+        for s0 in uncle_starts:
+            d0 = o - s0
+            found = []
+            for s1 in uncle_starts:
+                near = [q - s1 for q in onsets if abs(q - s1 - d0) <= 0.12]
+                if near:
+                    found.append(min(near, key=lambda z: abs(z - d0)))
+            if len(found) > len(best):
+                best = found
+    if len(best) < max(3, len(uncle_starts) - 1):
+        sys.exit(f"could not match the Uncle line starts to the sound ({len(best)} of {len(uncle_starts)}); check the recording and call id")
+    return float(np.median(best)), best
+
+
+def snap_onset(voiced: np.ndarray, rec_t: float, before: float, after: float, quiet: int = 12, earliest: bool = False) -> float | None:
+    """A sound onset (`quiet` hundredths of a second of quiet, then sound) within the window around rec_t, in recording seconds: the nearest to
+    rec_t, or the earliest in the window when `earliest`."""
+    lo, hi = max(int((rec_t - before) * 100), quiet), min(int((rec_t + after) * 100), len(voiced) - 1)
+    onsets = [i / 100 for i in range(lo, hi) if voiced[i] and not voiced[i - quiet:i].any()]
+    if not onsets:
+        return None
+    return onsets[0] if earliest else min(onsets, key=lambda o: abs(o - rec_t))
+
+
+def split_digits(text: str) -> tuple[str, str]:
+    """(words before the trailing digit words, the digits): "case number है आठ" -> ("case number है", "8"). Uses the extractor's own digit words."""
+    from mirage.extract import _tokenize
+    toks = [t for t in _tokenize(text, 0) if t.kind not in ("sep", "break")]
+    k = len(toks)
+    while k > 0 and toks[k - 1].kind in ("digit", "numeral", "mult"):
+        k -= 1
+    if any(t.kind == "mult" for t in toks[k:]):
+        sys.exit(f"a repeat word ('double', 'triple') in {text!r}: the digit captions do not handle it yet")
+    head = text[:toks[k - 1].end].strip(" ।,.") if k else ""
+    return head, "".join(t.val for t in toks[k:])
+
+
+def configure(call_id: str, recording: Path) -> dict:
+    """Set OFFSET_S, KEEP, CAPTIONS, EVIDENCE and UPI_CARD for one call from its logs and the recording's sound. Returns notes for printing."""
+    global SRC, CALL_ID, OFFSET_S, KEEP, CAPTIONS, EVIDENCE, UPI_CARD
+    SRC, CALL_ID = recording, call_id
+    cdir = ROOT / "data" / "calls" / call_id
+    events, turns = read_jsonl(cdir / "events.jsonl"), read_jsonl(cdir / "turns.jsonl")
+    transcripts, findings = read_jsonl(cdir / "transcripts.jsonl"), json.loads((cdir / "findings.json").read_text(encoding="utf8"))
+    uncle = []                                                   # (turn, start, end, text)
+    pending = None
+    for e in events:
+        if e["event"] == "uncle_speaking_start":
+            pending = e
+        elif e["event"] == "uncle_speaking_end" and pending:
+            uncle.append((pending["turn"], pending["t"], e["t"], pending["text"]))
+            pending = None
+    call_end = next(e["t"] for e in events if e["event"] == "end")
+    db = sound_levels()
+    voiced = db > db.max() - 38
+    OFFSET_S, delays = estimate_offset(voiced, [u[1] for u in uncle])
+    notes = {"offset": OFFSET_S, "delays": delays}
+
+    # cuts: quiet stretches of 1.6 s or more that do not end at an Uncle line are cut down to 0.6 s; the start is 0.96 s before the first caller sound
+    first = snap_onset(voiced, OFFSET_S + transcripts[0]["t"] - transcripts[0]["audio_s"] + 0.3, 1.0, 1.0)
+    start = (first if first is not None else OFFSET_S + 2.0) - OFFSET_S - 0.96
+    end = uncle[-1][2] + 1.55
+    quiet, runs, i = ~voiced, [], 0
+    while i < len(quiet):
+        if quiet[i]:
+            j = i
+            while j < len(quiet) and quiet[j]:
+                j += 1
+            runs.append((i / 100 - OFFSET_S, j / 100 - OFFSET_S))
+            i = j
+        else:
+            i += 1
+    cuts = []
+    for a, b in runs:
+        if a < start or b > end or b - a < 1.6 or any(abs(b - u[1]) < 0.35 for u in uncle):
+            continue
+        cuts.append((a + 0.3, b - 0.3))
+    pieces, t0 = [], start
+    for a, b in cuts:
+        pieces.append((t0, a))
+        t0 = b
+    pieces.append((t0, end))
+    KEEP = [(round((a + OFFSET_S) * FPS) / FPS - OFFSET_S, round((b + OFFSET_S) * FPS) / FPS - OFFSET_S) for a, b in pieces]
+    notes.update(start=start, end=end, cuts=cuts)
+
+    # caption windows
+    caps: list[tuple] = []
+    for turn, s0, e0, text in uncle:
+        if text not in ENGLISH_UNCLE:
+            sys.exit(f"no English for Uncle's line: {text!r}")
+        snapped = snap_onset(voiced, s0 + OFFSET_S, 0.15, 0.15)
+        caps.append((UNCLE, (snapped - OFFSET_S) if snapped else s0, e0 - 0.5, "", ENGLISH_UNCLE[text], "text", False))
+    pieces_c = []
+    for idx, r in enumerate(transcripts):
+        lat = (r.get("server_latency_ms") or 0) / 1000
+        s0, e0 = r["t"] - lat - r["audio_s"] + 0.3, r["t"] - lat - 0.4
+        snapped = snap_onset(voiced, s0 + OFFSET_S, 0.7, 0.2, quiet=25, earliest=True)   # the transcript's audio length includes padding: the sound starts a little earlier
+        if snapped is not None:
+            s0 = snapped - OFFSET_S
+        head, digits = split_digits(r["text"])
+        if head and not any(head.endswith(k2) for k2 in ENGLISH_CALLER_LEAD):
+            digits = ""                      # a sentence that merely ends in a number word ("... verify officer one"): shown as words
+        pieces_c.append(dict(i=idx, s=s0, e=max(e0, s0 + 0.9), text=r["text"], head=head, digits=digits))
+    run_digits: list[dict] = []
+    text_run: list[dict] = []
+
+    def flush_text():
+        if text_run:
+            words = " ".join(ENGLISH_CALLER[p["text"].rstrip("।").strip()] if p["text"].rstrip("।").strip() in ENGLISH_CALLER else
+                             sys.exit(f"no English for the caller's line: {p['text']!r}") for p in text_run)
+            caps.append((CALLER, text_run[0]["s"], text_run[-1]["e"], "", words, "text", False))
+            text_run.clear()
+
+    def flush_digits():
+        if not run_digits:
+            return
+        label, shown, emitted = run_digits[0]["label"], "", 0
+        for k, p in enumerate(run_digits):
+            shown = (shown + " " + " ".join(p["digits"])).strip()
+            nxt = run_digits[k + 1]["s"] if k + 1 < len(run_digits) else p["e"] + 0.5
+            if nxt - p["s"] < 0.4 and k + 1 < len(run_digits):
+                continue                     # a state that would flash by (the "zero" at the end of the lead-in sentence): the next one includes it
+            caps.append((CALLER, p["s"], nxt, label, shown, "digits", emitted > 0))
+            emitted += 1
+        run_digits.clear()
+
+    for p in pieces_c:
+        if not p["digits"]:
+            flush_digits()
+            if text_run and (p["s"] - text_run[-1]["e"] >= 1.0 or any(text_run[-1]["e"] < u[1] < p["s"] for u in uncle)):
+                flush_text()
+            text_run.append(p)
+            continue
+        flush_text()
+        if p["head"]:
+            flush_digits()
+            lead = next((v for k2, v in ENGLISH_CALLER_LEAD.items() if p["head"].endswith(k2) or p["head"] == k2), None)
+            if lead is None:
+                sys.exit(f"no English for the caller's lead-in: {p['head']!r}")
+            start_digits = p["s"]
+            if lead[0]:
+                caps.append((CALLER, p["s"], p["e"], "", lead[0], "text", False))
+                start_digits = p["e"] + 0.05
+            run_digits.append(dict(p, label=lead[1], s=start_digits))
+        else:
+            run_digits.append(dict(p, label=run_digits[0]["label"] if run_digits else "Digits"))
+    flush_text()
+    flush_digits()
+    CAPTIONS = sorted(caps, key=lambda c: c[1])
+
+    # evidence: the first turn whose findings hold each item, at the start of Uncle's line for that turn
+    starts = {u[0]: u[1] for u in uncle}
+    seen, EVIDENCE = set(), []
+    for tr in turns:
+        for f in tr["findings"]:
+            key = (f["kind"], f["value"])
+            if key in seen:
+                continue
+            seen.add(key)
+            name, short = KIND_NAMES.get(f["kind"], (f["kind"].upper(), f["kind"].upper()))
+            label = f"{name} HEARD, TO CONFIRM" if f["needs_confirmation"] else f"{name} CAPTURED"
+            EVIDENCE.append((starts.get(tr["turn"], tr["reply_started_s"]), label, f["value"], short))
+
+    vpa = next(f for f in findings.get("vpa", []))
+    chips = [(f"confidence: {vpa['confidence']}", False), ("valid format" if vpa["valid"] else f"not valid: {vpa['reason']}", False)]
+    if vpa["needs_confirmation"]:
+        chips.append(("needs confirmation", True))
+    maybe = list(vpa.get("candidates") or []) or ([vpa["suggested"]] if vpa.get("suggested") else [])
+    UPI_CARD = dict(value=vpa["value"], chips=chips,
+                    note=("heard as above; a guess, not the value: maybe " + " or ".join(maybe)) if maybe else "",
+                    quote=f"\u201c{vpa['quote']}\u201d at {mmss(vpa['t'])}")
+    return notes
+
+
 # ------------------------------------------------------------------ ffmpeg plumbing
 def run(cmd: list[str]) -> None:
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf8", errors="replace")
@@ -784,6 +997,8 @@ def build_audio(ev: list[dict]) -> Path:
 
 
 def render(plan_only: bool = False) -> None:
+    notes = configure(CALL_ID, SRC)
+    print(f"offset {OFFSET_S:.2f} s (recording = call log + offset; Uncle line delays {[round(d, 2) for d in notes['delays']]})")
     wins, ev, total = caption_windows(), evidence_windows(), main_length()
     print(f"kept {total:.2f} s of the call; with cards {TITLE_S + total + END_S:.2f} s")
     print("cuts (call-log seconds removed):", [(round(KEEP[i][1], 2), round(KEEP[i + 1][0], 2), round(KEEP[i + 1][0] - KEEP[i][1], 2)) for i in range(len(KEEP) - 1)])
@@ -864,9 +1079,12 @@ def render(plan_only: bool = False) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--plan", action="store_true", help="print the cut list and caption windows, render nothing")
+    ap.add_argument("--call", default=CALL_ID, help="call id in data/calls/")
+    ap.add_argument("--recording", default=str(SRC), help="the screen recording of that call")
     ap.add_argument("--music", choices=["calm", "build"], default="calm", help="background music: slow pad (default) or a pulse that builds")
     ap.add_argument("--out", default=None, help="output file name inside data/video/")
     a = ap.parse_args()
+    CALL_ID, SRC = a.call, Path(a.recording)
     MUSIC_STYLE = a.music
     OUT_NAME = a.out or ("mirage_demo_x_build.mp4" if a.music == "build" else "mirage_demo_x.mp4")
     render(a.plan)

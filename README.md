@@ -65,7 +65,14 @@ packet is labelled as a staged demo with synthetic data. Confidence is the extra
 <file>` recomputes the sha256, which shows only that the file is unchanged since it was generated. **No claim is made about legal admissibility.**
 `python -m mirage.packetpdf data/packets/<id>.json` prints a one-or-two-page PDF view of a packet that verifies, using an installed Edge or Chrome.
 
-**Sample packet:** _to be added in `docs/sample/` (generated from the owner's rehearsal call)_
+**Sample packet:** the staged demo call `20261104_124958_c42d`, as [`docs/sample/20261104_124958_c42d.json`](docs/sample/20261104_124958_c42d.json)
+(the record) and [`docs/sample/20261104_124958_c42d.pdf`](docs/sample/20261104_124958_c42d.pdf) (a two-page view of it). It shows what the call captured,
+each with the extractor's confidence label, the exact quote and the time it arrived: the case number `82614` (`keyword`), the phone number `0000318652`
+(`keyword`) and the UPI id `verifyofficer123@okaxis` (`heard`); plus the stage timeline, how the call ended (the caller's side hung up) and what Uncle
+disclosed. **The UPI id is only "heard" and needs confirmation:** "OK axis" was said as two words and joined into one handle, and nothing confirmed it.
+Everything in it is synthetic and staged, and it holds no audio (none was saved). Check it with
+`python -m mirage.packet verify docs/sample/20261104_124958_c42d.json`. **The hash covers the JSON, not the PDF**, and no claim is made about legal
+admissibility.
 
 ## Results
 
