@@ -26,6 +26,7 @@ Facts the validators rely on (checked 1 Nov 2026):
 """
 from __future__ import annotations
 
+import difflib
 import re
 import unicodedata
 from dataclasses import dataclass, replace
@@ -137,6 +138,17 @@ FILLER_WORDS = {_norm(w) for w in (
     "है", "hai", "hain", "हैं", "का", "ka", "की", "ke", "id", "आईडी", "code", "कोड", "ye", "yeh", "ये", "यह",
     "मेरा", "मेरी", "mera", "meri", "my", "is", "the", "and", "और",
 )}
+# A bare "ok" said before a provider name ("at OK axis"). Prisma writes the two words apart, and sometimes "okay" for "ok".
+# Spoken variants are from the rehearsal calls ("access" for "axis") and from memory; UNVERIFIED, like the handle list in config.py.
+OK_WORDS = {_norm(w) for w in ("ok", "okay", "ओके")}
+HANDLE_FRAGMENTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "axis": (("axis",), ("access",), ("axes",), ("ax", "is"), ("एक्सिस",), ("ऐक्सिस",), ("एक्सेस",)),
+    "sbi": (("sbi",), ("s", "b", "i"), ("एसबीआई",), ("एस", "बी", "आई")),
+    "icici": (("icici",), ("i", "c", "i", "c", "i"), ("आईसीआईसीआई",), ("आई", "सी", "आई", "सी", "आई")),
+    "hdfcbank": (("hdfc", "bank"), ("hdfc",), ("h", "d", "f", "c", "bank"), ("h", "d", "f", "c"), ("एचडीएफसी", "बैंक"), ("एचडीएफसी",)),
+}
+_FRAGMENT_FORMS = sorted(((tuple(_norm(w) for w in seq), "ok" + suffix) for suffix, seqs in HANDLE_FRAGMENTS.items() for seq in seqs),
+                         key=lambda pair: -len(pair[0]))
 DOT_WORDS = {_norm(w) for w in ("dot", "डॉट", "डोट", "बिंदु")}
 UNDERSCORE_WORDS = {_norm(w) for w in ("underscore", "अंडरस्कोर")}
 DASH_WORDS = {_norm(w) for w in ("dash", "hyphen", "डैश", "हाइफ़न")}
@@ -435,28 +447,59 @@ def _suggest_provider(heard: list[str], providers: frozenset[str]) -> str | None
     return None
 
 
-def _shared_start(a: str, b: str) -> int:
-    return next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+def _similarity(heard: str, target: str) -> float:
+    return difflib.SequenceMatcher(None, heard, target).ratio()
 
 
 def _near_miss_handles(heard: str, providers: frozenset[str]) -> list[str]:
-    """Known handles a heard-but-unknown handle may have been, when it starts with "ok" (Prisma wrote "okay" for "ok axis").
-    Nearest first: the longest shared start, then the smallest edit distance. Only a LIST OF GUESSES; the heard value is kept."""
+    """Known handles a heard-but-unknown handle may have been, when it starts with "ok" (Prisma wrote "okay" for "ok axis"), best match first
+    (difflib's similarity of what was heard to each handle, then alphabetical). A bare "ok" says nothing about which handle, so those are
+    listed alphabetically: no handle is made to look closer than another. Only a LIST OF GUESSES; the heard value is kept."""
     h = heard.lower()
     if not (h.isascii() and h.isalpha() and h.startswith("ok")):
         return []
-    return sorted((t for t in providers if t.startswith("ok")), key=lambda t: (-_shared_start(h, t), _edit_distance(h, t), t))
+    cands = [t for t in providers if t.startswith("ok")]
+    if h == "ok":
+        return sorted(cands)
+    return sorted(cands, key=lambda t: (-_similarity(h, t), t))
 
 
-def _vpa_finding(toks, idxs, local: str, provider_raw: list[str], transcripts, synthetic_mode) -> Finding:
+def _ok_fragment(toks, k: int, claimed: set[int], src: int) -> tuple[str, list[int]] | None:
+    """Words right after a bare "ok" in the SAME transcript piece that spell a provider ("axis", "access", "s b i", "hdfc bank"...):
+    ("okaxis", token indices), else None. Longest spoken form first."""
+    word_at, j = [], k
+    while j < len(toks) and len(word_at) < 5:
+        t = toks[j]
+        if t.kind == "sep" and t.src == src:
+            j += 1
+            continue
+        if t.kind != "word" or t.src != src or j in claimed:
+            break
+        word_at.append(j)
+        j += 1
+    for form, handle in _FRAGMENT_FORMS:
+        if len(form) <= len(word_at) and tuple(toks[i].norm for i in word_at[:len(form)]) == form:
+            return handle, list(range(k, word_at[len(form) - 1] + 1))
+    return None
+
+
+def _vpa_finding(toks, idxs, local: str, provider_raw: list[str], transcripts, synthetic_mode, joined: str | None = None) -> Finding:
     providers = KNOWN_UPI_PROVIDERS | (SYNTHETIC_UPI_PROVIDERS if synthetic_mode else frozenset())
+    if joined:      # "OK axis" said as two words: the handle is read as "okaxis", but it was NOT heard as one word, so it stays unconfirmed
+        value = f"{local}@{joined}"
+        valid = is_valid_vpa(value)
+        reason = f"handle joined from the words heard, {' '.join(provider_raw)!r}: confirm it"
+        if not valid:
+            reason = "not a valid UPI id as heard (a UPI id is plain ASCII: name@handle); " + reason
+        return _make(toks, idxs, transcripts, kind="vpa", value=value, valid=valid, reason=reason, confidence="heard",
+                     needs_confirmation=True)
     value = f"{local}@{' '.join(provider_raw)}"
     known = provider_raw[0].lower() in providers and len(provider_raw) == 1
     suggestion = None if known else _suggest_provider(provider_raw, providers)
     likely: list[str] = [] if known or len(provider_raw) != 1 else _near_miss_handles(provider_raw[0], providers)
-    if likely and suggestion is None:   # name one only if it shares clearly more of its start with what was heard than the next one
+    if likely and suggestion is None and provider_raw[0].lower() != "ok":   # name one only if it clearly matches better than the next
         h = provider_raw[0].lower()
-        if len(likely) == 1 or _shared_start(h, likely[0]) > _shared_start(h, likely[1]):
+        if len(likely) == 1 or _similarity(h, likely[0]) - _similarity(h, likely[1]) >= 0.1:
             suggestion = likely[0]
     valid = is_valid_vpa(value)
     reason = "" if valid else "not a valid UPI id as heard (a UPI id is plain ASCII: name@handle)"
@@ -480,6 +523,13 @@ def _find_written_vpas(toks, claimed, transcripts, synthetic_mode) -> list[tuple
         if not local or not provider:
             continue
         idxs, provider_raw = [k], [provider]
+        frag = _ok_fragment(toks, k + 1, claimed, t.src) if _norm(provider) in OK_WORDS else None
+        if frag:
+            idxs += frag[1]
+            claimed.update(idxs)
+            provider_raw += [toks[i].raw for i in frag[1] if toks[i].kind == "word"]
+            out.append((min(idxs), _vpa_finding(toks, idxs, local, [provider] + provider_raw[1:], transcripts, synthetic_mode, joined=frag[0])))
+            continue
         nxt = toks[k + 1] if k + 1 < len(toks) else None
         if provider.lower() not in KNOWN_UPI_PROVIDERS | SYNTHETIC_UPI_PROVIDERS and nxt and nxt.norm in UPI_WORDS \
                 and (k + 1) not in claimed:
@@ -532,6 +582,13 @@ def _find_spoken_vpas(toks, claimed, transcripts, synthetic_mode) -> list[tuple[
             continue
         idxs = sorted(local_idxs) + list(range(k, end)) + [end]
         provider_raw = [toks[end].raw]
+        frag = _ok_fragment(toks, end + 1, claimed, toks[end].src) if toks[end].norm in OK_WORDS else None
+        if frag:
+            idxs += frag[1]
+            provider_raw += [toks[i].raw for i in frag[1] if toks[i].kind == "word"]
+            claimed.update(idxs)
+            out.append((min(idxs), _vpa_finding(toks, idxs, "".join(reversed(local_parts)), provider_raw, transcripts, synthetic_mode, joined=frag[0])))
+            continue
         known = toks[end].norm in KNOWN_UPI_PROVIDERS | SYNTHETIC_UPI_PROVIDERS
         if not known and end + 1 < len(toks) and toks[end + 1].norm in UPI_WORDS and end + 1 not in claimed:
             idxs.append(end + 1)

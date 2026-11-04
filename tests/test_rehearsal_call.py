@@ -32,10 +32,21 @@ def ids(brain: CallBrain) -> list[Finding]:
 # ---------------------------------------------------------------- 1. the same UPI id in another case is one card
 
 def test_the_same_upi_id_in_a_different_case_is_kept_once_with_the_first_spelling_and_a_note():
-    vpas = ids(replay())
+    turns = [[(88.109, 4.276, "UPI ID है verify officer"), (89.953, 1.824, "One two three"), (91.812, 1.856, "At okay, at sir.")],
+             [(100.718, 2.228, "UPI ID है।"), (106.343, 5.536, "Verify officer one two three at okay")]]    # the rehearsal's words, "access" left out
+    vpas = ids(replay(turns))
     assert len(vpas) == 1
     assert vpas[0].value == "verifyofficer123@okay"                      # first spelling, as heard
     assert "said again at 106.3 s as 'Verifyofficer123@okay'" in vpas[0].reason
+
+
+def test_the_rehearsal_call_now_has_a_second_card_for_okay_access_read_as_okaxis():
+    """Since the "ok axis" join, the second mention ("at okay access", one piece) is read as @okaxis, a different handle from the first
+    ("at okay"), so the two are not merged: they differ in the handle, not in case. Both stay unconfirmed."""
+    first, second = ids(replay())
+    assert first.value == "verifyofficer123@okay" and first.needs_confirmation
+    assert second.value == "Verifyofficer123@okaxis" and second.needs_confirmation and second.confidence == "heard"
+    assert second.quote == "Verify officer one two three at okay access"
 
 
 def test_extract_and_tidy_agree_when_both_spellings_are_in_one_list():

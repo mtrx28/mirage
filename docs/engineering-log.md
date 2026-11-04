@@ -1373,6 +1373,22 @@ Replay (offline, the logged transcripts turn by turn into a fresh brain, rules b
 one earlier call) only the rehearsal call's stored findings change (4 cards become 2: the two UPI cards become one, and the `123` card goes). The other ten are identical before and after. The replay does not reproduce the live stored findings exactly for
 three older calls (it does not know Uncle's earlier hints), so only the before/after difference is meaningful.
 
+## UPI handles: "OK axis" joined, and the guesses ranked by match (3 Nov 2026; staged, dev data)
+
+The demo call (`20261103_174137_097a`) had the caller say "verify officer one two three at OK axis"; the transcript piece read "Two three at OK axis", but the card stored `verifyofficer123@OK` and the guess list put `oksbi` first.
+Two changes, both in `mirage/extract.py`:
+
+1. **A bare "ok" followed, in the same transcript piece, by a provider word is joined into the handle.** "OK axis", "okay access" (Prisma's "access" for "axis"), "ok s b i", "ok hdfc bank" and a few Devanagari forms give
+   `@okaxis`, `@okaxis`, `@oksbi`, `@okhdfcbank`. The spoken forms are from the two rehearsal calls and from memory: UNVERIFIED, like the handle list. The value is still read from words that were **not heard as one word**, so
+   confidence stays `heard`, `needs_confirmation` stays true, the reason says "handle joined from the words heard", and the quote is exactly the words as heard ("verify officer one | Two three at OK axis"). Pieces that
+   arrive apart ("At" / "Okay" / "AXIX") are not joined.
+2. **The guess list is ranked by similarity to what was heard** (difflib ratio, then alphabetical). A bare "ok" says nothing about which handle, so it is listed alphabetically with no suggestion; before, `oksbi`
+   came first only because it is the shortest name. "okay" still ranks `okaxis` first and suggests it, because it is clearly the closest.
+
+Replay (offline, the logged transcripts turn by turn into a fresh brain, HEAD against this change; 17 calls in `data/calls/`): **only UPI cards changed, in 4 calls.** The demo call and `20261103_173303_f2fd` go from
+`@OK` to `@okaxis`; `20261103_164835_a529` goes from `@okay` to `@okaxis`; the rehearsal call (`20261103_162757_6dd0`) now has two cards for the same id, `@okay` (first mention, near miss) and `@okaxis` (the
+"okay access" mention), because they differ in the handle and are not merged. No phone, account, case or other card changed in any call, so no E1 number moved. Stored findings in the call folders are not rewritten.
+
 ## Later list
 
 - Spelled-letter patterns like "M for Mohan" (skipped for now; STT letters are the weak point, E1 will measure it).
