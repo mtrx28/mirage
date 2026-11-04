@@ -16,7 +16,7 @@ invented. A rule-based state machine picks what Uncle does; a safety gate checks
 One server process at a time (a lock file stops a second one). Keys go in `.env` only. See `docs/voice.md` for the voice path and
 `docs/engineering-log.md` for what was built, measured and decided.
 
-**Demo video:** _link to be added_
+**Demo video:** https://x.com/hon3y_badg3r3/status/2117889279657644046?a=BmkeVUCzVh7rKak9Sxk&s=20
 
 ## What this is not
 
