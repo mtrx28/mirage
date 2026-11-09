@@ -2,6 +2,7 @@
 
     python scripts/make_demo_video.py --call <id> --recording <mp4> --music build     # render into data/video/
     python scripts/make_demo_video.py --call <id> --recording <mp4> --plan            # print the offset, cuts and caption/toast times only
+    ... --no-cuts --scenes --out mirage_demo_submission.mp4   # the longer cut: the whole call, then two explainer scenes (packet, results)
 
 What it does, in order:
   1. cuts the screen recording to the call (no speed-ups; only silences where nobody speaks are shortened),
@@ -46,6 +47,9 @@ CAP_Y = 1128                              # the caption zone runs from here to t
 CAP_H = H - CAP_Y
 CROP = (538, 210, 1336, 1230)             # x, y, w, h of the page inside the 2448x1440 recording (no tab bar, no address bar, no staged-data banner, no scrollbar)
 TITLE_S, END_S = 3.0, 3.0
+NO_CUTS = False                       # --no-cuts: keep every second of the call (only the lead-in and the tail are trimmed)
+SCENES = False                        # --scenes: after the call, an evidence-packet scene and a results scene
+SCENE_S = {"packet": 16.0, "results": 16.0}
 FADE_S = 0.2
 
 KEEP: list[tuple[float, float]] = []                 # call-log seconds kept; set by configure()
@@ -814,7 +818,7 @@ def configure(call_id: str, recording: Path) -> dict:
             i += 1
     cuts = []
     for a, b in runs:
-        if a < start or b > end or b - a < 1.6 or any(abs(b - u[1]) < 0.35 for u in uncle):
+        if NO_CUTS or a < start or b > end or b - a < 1.6 or any(abs(b - u[1]) < 0.35 for u in uncle):
             continue
         cuts.append((a + 0.3, b - 0.3))
     pieces, t0 = [], start
@@ -914,6 +918,131 @@ def configure(call_id: str, recording: Path) -> dict:
     return notes
 
 
+# ------------------------------------------------------------------ explainer scenes after the call (for the longer cut)
+RESULTS = [
+    # (big text, line one, line two): numbers copied from docs/results.md (staged calls, synthetic data, small samples)
+    ("16 of 20", "spoken numbers stored exactly", "4 live calls, 2 speakers"),
+    ("4 to 0", "red-team leaks, friend's 15 lines", "untuned first run, then after fixes (dev data)"),
+    ("330 ms", "Prisma server latency, median", "p95 439 ms, 132 speech segments"),
+    ("910", "offline tests passing", "no network needed"),
+]
+
+
+def packet_files() -> tuple[Path, Path]:
+    for d in (ROOT / "docs" / "sample", ROOT / "data" / "packets"):
+        j, f = d / f"{CALL_ID}.json", d / f"{CALL_ID}.pdf"
+        if j.exists() and f.exists():
+            return j, f
+    sys.exit(f"no packet JSON and PDF for {CALL_ID} in docs/sample/ or data/packets/: run python -m mirage.packet build and mirage.packetpdf first")
+
+
+def packet_page() -> tuple[Image.Image, tuple[float, float]]:
+    """Page 1 of the packet's PDF, cropped to the call summary and the intel table (found by their headings), at high resolution, and the
+    vertical span of the UPI row as fractions of that picture (found by its quote text)."""
+    import fitz
+    _, pdf = packet_files()
+    page = fitz.open(str(pdf))[0]
+    top = page.search_for("Call summary")[0].y0 - 3
+    bottom = page.search_for("Payment intel")[0].y1 + 8
+    clip = fitz.Rect(page.rect.x0 + 26, top, page.rect.x1 - 26, bottom)
+    pix = page.get_pixmap(dpi=230, clip=clip)
+    row = page.search_for("verify officer one")[0]
+    span = ((row.y0 - 1 - clip.y0) / clip.height, (row.y1 + 22 - clip.y0) / clip.height)
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples), span
+
+
+def fade_edges(img: Image.Image, plain: Image.Image, t: float, total: float, d: float = 0.35) -> Image.Image:
+    a = min(ramp(t, 0, d), ramp(total - t, 0, d))
+    return img if a >= 1 else Image.blend(plain, img, a)
+
+
+def scene_head(img: Image.Image, tag: str, headline: str, sub: str, t: float) -> None:
+    d = ImageDraw.Draw(img)
+    a = ramp(t, 0.1, 0.5)
+    col = lambda c: tuple(int(INK[i] + (c[i] - INK[i]) * a) for i in range(3))
+    tracked(d, 60, 128, tag, bahn(24, 700), col(AMBER), 5)
+    d.text((58, 222), headline, font=sitka(72, 700, 27), fill=col(CREAM), anchor="ls")
+    d.text((60, 280), sub, font=bahn(30, 330), fill=col(MUTED), anchor="ls")
+
+
+def packet_scene_frames(plain: Image.Image):
+    (page, span), packet = packet_page(), json.loads(packet_files()[0].read_text(encoding="utf8"))
+    total = SCENE_S["packet"]
+    cw = 960
+    base = page.resize((cw, int(page.height * cw / page.width)), Image.LANCZOS)
+    ch = base.height
+    mask = Image.new("L", (cw, ch), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, cw - 1, ch - 1), 22, fill=255)
+    rows = ["Exact quote and time, for every item", "The extractor's own confidence label, never upgraded", "sha256 hash: the file is unchanged since it was made"]
+    chips = [(f"{i['kind']}  {i['value']}", f"{i['confidence']}" + (", to confirm" if i["needs_confirmation"] else ""), i["needs_confirmation"]) for i in packet["intel"]]
+    y_card, y_rows, y_chips = 340, 340 + ch + 20 + 70, 340 + ch + 20 + 70 + 3 * 60 + 24
+    hy0, hy1 = int(span[0] * ch), int(span[1] * ch)
+    for k in range(int(total * FPS)):
+        t = k / FPS
+        img = plain.copy()
+        shimmer(img, t + 8, 0.35)
+        scene_head(img, "THE EVIDENCE PACKET", "Every detail, with its receipt.", "one JSON file per call, plus a PDF view", t)
+        view = base.copy()
+        ha = ramp(t, 8.6, 9.2)
+        if ha > 0:                                  # the UPI row is outlined: the one that was only heard
+            vd = ImageDraw.Draw(view, "RGBA")
+            vd.rounded_rectangle((8, hy0, cw - 8, hy1), 10, outline=AMBER + (int(255 * ha),), width=4, fill=AMBER + (int(40 * ha),))
+        card = Image.new("RGBA", (cw + 12, ch + 12), (0, 0, 0, 0))
+        ImageDraw.Draw(card).rounded_rectangle((0, 0, cw + 11, ch + 11), 26, fill=AMBER + (255,))
+        card.paste(view, (6, 6), mask)
+        a = ramp(t, 0.5, 1.1)
+        card.putalpha(card.getchannel("A").point(lambda v: int(v * a)))
+        img.paste(card, (54, y_card - round((1 - ease_out(a)) * 16)), card)
+        d = ImageDraw.Draw(img)
+        for i, text in enumerate(rows):
+            ra = ramp(t, 2.0 + i * 2.0, 2.5 + i * 2.0)
+            if ra <= 0:
+                continue
+            y = y_rows + i * 50 + (1 - ease_out(ra)) * 10
+            c = lambda col: tuple(int(INK[j] + (col[j] - INK[j]) * ra) for j in range(3))
+            d.ellipse((62, y - 20, 78, y - 4), fill=c(GREEN))
+            d.text((98, y), text, font=bahn(31, 400), fill=c(CREAM), anchor="ls")
+        for i, (label, conf, warn) in enumerate(chips):
+            ca = ramp(t, 9.4 + i * 1.2, 9.9 + i * 1.2)
+            if ca <= 0:
+                continue
+            y0 = y_chips + i * 56 + (1 - ease_out(ca)) * 10
+            col, bgc = (AMBER, (34, 27, 8)) if warn else (GREEN, (16, 44, 26))
+            m = tuple(int(INK[j] + (bgc[j] - INK[j]) * ca) for j in range(3))
+            ln = tuple(int(INK[j] + (col[j] - INK[j]) * ca) for j in range(3))
+            d.rounded_rectangle((60, y0, 1020, y0 + 44), 22, fill=m, outline=ln, width=2)
+            d.text((84, y0 + 31), label, font=mono(24, 700), fill=tuple(int(INK[j] + (CREAM[j] - INK[j]) * ca) for j in range(3)), anchor="ls")
+            tw = tracked_width(conf.upper(), bahn(18, 700), 2)
+            tracked(d, 1000 - tw, y0 + 30, conf.upper(), bahn(18, 700), ln, 2)
+        yield fade_edges(img, plain, t, total)
+
+
+def results_scene_frames(plain: Image.Image):
+    total = SCENE_S["results"]
+    for k in range(int(total * FPS)):
+        t = k / FPS
+        img = plain.copy()
+        shimmer(img, t + 20, 0.35)
+        scene_head(img, "WHAT WE MEASURED", "Small samples, honest numbers.", "staged calls, synthetic data. Not rates for real callers.", t)
+        d = ImageDraw.Draw(img)
+        for i, (big, l1, l2) in enumerate(RESULTS):
+            a = ramp(t, 1.2 + i * 2.2, 1.8 + i * 2.2)
+            if a <= 0:
+                continue
+            y = 480 + i * 190 + (1 - ease_out(a)) * 14
+            c = lambda col: tuple(int(INK[j] + (col[j] - INK[j]) * a) for j in range(3))
+            d.text((60, y + 60), big, font=sitka(104, 700, 27), fill=c(AMBER if i == 1 else CREAM), anchor="ls")
+            d.line((470, y - 6, 470, y + 70), fill=c(EDGE), width=2)
+            d.text((500, y + 28), l1, font=bahn(33, 500), fill=c(CREAM), anchor="ls")
+            d.text((500, y + 70), l2, font=bahn(26, 350), fill=c(MUTED), anchor="ls")
+        a = ramp(t, 10.8, 11.6)
+        if a > 0:
+            c = lambda col: tuple(int(INK[j] + (col[j] - INK[j]) * a) for j in range(3))
+            for i, ln in enumerate(["We publish the misses too: dropped digit tails,", "and a wrong digit stored with high confidence."]):
+                d.text((60, 1262 + i * 40), ln, font=bahn(30, 450), fill=c(AMBER), anchor="ls")
+        yield fade_edges(img, plain, t, total)
+
+
 # ------------------------------------------------------------------ ffmpeg plumbing
 def run(cmd: list[str]) -> None:
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf8", errors="replace")
@@ -984,7 +1113,8 @@ def build_audio(ev: list[dict]) -> Path:
         i = int(e["s"] * sr)
         n = min(len(c), len(main) - i)
         main[i:i + n] += c[:n, None]
-    pre, post = np.zeros((int(TITLE_S * sr), ch), np.float32), np.zeros((int(END_S * sr), ch), np.float32)
+    pre = np.zeros((int(TITLE_S * sr), ch), np.float32)
+    post = np.zeros((int((END_S + (sum(SCENE_S.values()) if SCENES else 0)) * sr), ch), np.float32)
     full = np.clip(np.concatenate([pre, main, post]), -1, 1)
     path = WORK / "full.wav"
     write_wav(path, full, sr)
@@ -1000,7 +1130,8 @@ def render(plan_only: bool = False) -> None:
     notes = configure(CALL_ID, SRC)
     print(f"offset {OFFSET_S:.2f} s (recording = call log + offset; Uncle line delays {[round(d, 2) for d in notes['delays']]})")
     wins, ev, total = caption_windows(), evidence_windows(), main_length()
-    print(f"kept {total:.2f} s of the call; with cards {TITLE_S + total + END_S:.2f} s")
+    extra = sum(SCENE_S.values()) if SCENES else 0
+    print(f"kept {total:.2f} s of the call; with cards{' and scenes' if SCENES else ''} {TITLE_S + total + extra + END_S:.2f} s")
     print("cuts (call-log seconds removed):", [(round(KEEP[i][1], 2), round(KEEP[i + 1][0], 2), round(KEEP[i + 1][0] - KEEP[i][1], 2)) for i in range(len(KEEP) - 1)])
     print(f"start trimmed: recording 0 to {KEEP[0][0] + OFFSET_S:.2f} s; end trimmed: recording {KEEP[-1][1] + OFFSET_S:.2f} s to the end")
     if plan_only:
@@ -1061,18 +1192,25 @@ def render(plan_only: bool = False) -> None:
     enc = ["-c:v", "libx264", "-crf", "12", "-preset", "fast", "-pix_fmt", "yuv420p"]
     pipe_frames((title_frame(plain, k / FPS / 1.35) for k in range(int(TITLE_S * FPS))), (W, H), enc, WORK / "title.mp4")
     pipe_frames((end_frame(plain, k / FPS) for k in range(int(END_S * FPS))), (W, H), enc, WORK / "end.mp4")
+    if SCENES:
+        pipe_frames((f for gen in (packet_scene_frames(plain), results_scene_frames(plain)) for f in gen), (W, H), enc, WORK / "scenes.mp4")
 
     fade_f = FADE_S
+    ins = [WORK / "title.mp4", main_ov] + ([WORK / "scenes.mp4"] if SCENES else []) + [WORK / "end.mp4", audio, WORK / "music.wav"]
+    nv = len(ins) - 2
+    seq = "[0:v][mv]" + ("[2:v][3:v]" if SCENES else "[2:v]")
     graph = (f"[1:v]fade=t=in:d={fade_f},fade=t=out:st={total - fade_f}:d={fade_f}[mv];"
-             f"[0:v][mv][2:v]concat=n=3:v=1:a=0,fps={FPS},format=yuv420p[v];"
-             f"[3:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,asplit=2[vox][sc];"
-             f"[4:a][sc]sidechaincompress=threshold=0.08:ratio=2.5:attack=25:release=500:makeup=1[duck];"
+             f"{seq}concat=n={nv}:v=1:a=0,fps={FPS},format=yuv420p[v];"
+             f"[{nv}:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,asplit=2[vox][sc];"
+             f"[{nv + 1}:a][sc]sidechaincompress=threshold=0.08:ratio=2.5:attack=25:release=500:makeup=1[duck];"
              f"[vox][duck]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.89:level=disabled[a]")
     final = OUT / OUT_NAME
-    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(WORK / "title.mp4"), "-i", str(main_ov), "-i", str(WORK / "end.mp4"),
-         "-i", str(audio), "-i", str(WORK / "music.wav"), "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
-         "-c:v", "libx264", "-profile:v", "high", "-level", "4.2", "-preset", "slow", "-crf", "17", "-maxrate", "14M", "-bufsize", "28M",
-         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", str(final)])
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
+    for f in ins:
+        cmd += ["-i", str(f)]
+    run(cmd + ["-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+               "-c:v", "libx264", "-profile:v", "high", "-level", "4.2", "-preset", "slow", "-crf", "17", "-maxrate", "14M", "-bufsize", "28M",
+               "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", str(final)])
     print("wrote", final)
 
 
@@ -1083,8 +1221,10 @@ if __name__ == "__main__":
     ap.add_argument("--recording", default=str(SRC), help="the screen recording of that call")
     ap.add_argument("--music", choices=["calm", "build"], default="calm", help="background music: slow pad (default) or a pulse that builds")
     ap.add_argument("--out", default=None, help="output file name inside data/video/")
+    ap.add_argument("--no-cuts", action="store_true", help="keep every second of the call (only the lead-in and the tail are trimmed)")
+    ap.add_argument("--scenes", action="store_true", help="after the call, add an evidence-packet scene and a results scene")
     a = ap.parse_args()
     CALL_ID, SRC = a.call, Path(a.recording)
-    MUSIC_STYLE = a.music
+    MUSIC_STYLE, NO_CUTS, SCENES = a.music, a.no_cuts, a.scenes
     OUT_NAME = a.out or ("mirage_demo_x_build.mp4" if a.music == "build" else "mirage_demo_x.mp4")
     render(a.plan)

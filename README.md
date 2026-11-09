@@ -1,5 +1,7 @@
 # Mirage: a scam-baiting voice agent (Gnani AI internship challenge)
 
+**One-page pitch: [docs/PITCH.md](docs/PITCH.md)**
+
 Mirage is an **inbound-only** voice agent. A caller who might be a scammer reaches "Rajesh Uncle", a fictional 68-year-old retired
 Hindi-speaking clerk, who keeps them talking so that the payment details they ask for (a UPI id, an account number, an IFSC code,
 a phone number) are recorded with the exact words and time they were said. Everything about Uncle (phone number, account, bank) is
@@ -16,7 +18,7 @@ invented. A rule-based state machine picks what Uncle does; a safety gate checks
 One server process at a time (a lock file stops a second one). Keys go in `.env` only. See `docs/voice.md` for the voice path and
 `docs/engineering-log.md` for what was built, measured and decided.
 
-**Demo video:** https://x.com/hon3y_badg3r3/status/2117889279657644046?a=BmkeVUCzVh7rKak9Sxk&s=20
+**Demo video:** https://drive.google.com/file/d/1MQFG7_2AiYRvboQqSGAVYEMcb-HVAk2s/view?usp=sharing
 
 ## What this is not
 
